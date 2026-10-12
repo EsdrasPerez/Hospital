@@ -139,4 +139,25 @@ public class PagosServiceImpl implements PagosService {
         return pagosRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe el pago con ID: " + id));
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PagosDTO> findByFactura(Long idFactura) {
+        if (!facturasRepository.existsById(idFactura)) {
+            throw new RecursoNoEncontradoException("No existe la factura con ID: " + idFactura);
+        }
+        return pagosRepository.findByIdFactura(idFactura)
+                .stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PagosDTO> findByCuenta(Long idCuenta) {
+        return pagosRepository.findByIdCuenta(idCuenta)
+                .stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
 }

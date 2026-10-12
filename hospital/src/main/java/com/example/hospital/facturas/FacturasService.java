@@ -1,6 +1,7 @@
 package com.example.hospital.facturas;
 
 import com.example.hospital.facturas.dto.FacturasDTO;
+import com.example.hospital.facturas.dto.SaldoFacturaDTO;
 
 import java.util.List;
 
@@ -23,4 +24,6 @@ public interface FacturasService {
     FacturasDTO cambiarEstado(Long id, Long nuevoEstadoId);
 
     void eliminar(Long id);
+
+    SaldoFacturaDTO obtenerSaldo(Long idFactura);
 }

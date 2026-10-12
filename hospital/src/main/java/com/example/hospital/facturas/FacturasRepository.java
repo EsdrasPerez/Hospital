@@ -27,4 +27,6 @@ public interface FacturasRepository extends JpaRepository<Facturas, Long> {
     boolean existsByIdMetodoPago(Long idMetodoPago);
 
     boolean existsByIdEstadoFactura(Long idEstadoFactura);
+
+    long countByIdEstadoFacturaAndActivoTrue(Long idEstadoFactura);
 }

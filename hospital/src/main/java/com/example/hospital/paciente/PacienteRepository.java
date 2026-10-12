@@ -31,4 +31,6 @@ public interface PacienteRepository extends JpaRepository<Paciente, Long> {
     boolean existsByIdTipoDeSangre(Long idTipoDeSangre);
 
     boolean existsByIdAlergias(Long idAlergias);
+
+    long countByActivoTrue();
 }

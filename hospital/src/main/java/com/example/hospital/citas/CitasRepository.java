@@ -31,4 +31,9 @@ public interface CitasRepository extends JpaRepository<Citas, Long> {
 
     // Listar citas por fecha
     List<Citas> findByFecha(LocalDate fecha);
+
+    // Agenda diaria de un médico ordenada por hora
+    List<Citas> findByIdMedicoAndFechaAndActivoTrueOrderByHoraAsc(Long idMedico, LocalDate fecha);
+
+    long countByFechaAndActivoTrue(LocalDate fecha);
 }

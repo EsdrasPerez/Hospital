@@ -7,6 +7,9 @@ import com.example.hospital.facturas.Facturas;
 import com.example.hospital.facturas.FacturasRepository;
 import com.example.hospital.facturas.FacturasService;
 import com.example.hospital.facturas.dto.FacturasDTO;
+import com.example.hospital.facturas.dto.SaldoFacturaDTO;
+import com.example.hospital.pagos.Pagos;
+import com.example.hospital.pagos.PagosRepository;
 import com.example.hospital.hospitalizaciones.Hospitalizaciones;
 import com.example.hospital.hospitalizaciones.HospitalizacionesRepository;
 import com.example.hospital.metodospago.MetodosPago;
@@ -35,17 +38,20 @@ public class FacturasServiceImpl implements FacturasService {
     private final HospitalizacionesRepository hospitalizacionesRepository;
     private final MetodosPagoRepository metodosPagoRepository;
     private final EstadosFacturaRepository estadosFacturaRepository;
+    private final PagosRepository pagosRepository;
 
     public FacturasServiceImpl(FacturasRepository facturasRepository,
                                PacienteRepository pacienteRepository,
                                HospitalizacionesRepository hospitalizacionesRepository,
                                MetodosPagoRepository metodosPagoRepository,
-                               EstadosFacturaRepository estadosFacturaRepository) {
+                               EstadosFacturaRepository estadosFacturaRepository,
+                               PagosRepository pagosRepository) {
         this.facturasRepository = facturasRepository;
         this.pacienteRepository = pacienteRepository;
         this.hospitalizacionesRepository = hospitalizacionesRepository;
         this.metodosPagoRepository = metodosPagoRepository;
         this.estadosFacturaRepository = estadosFacturaRepository;
+        this.pagosRepository = pagosRepository;
     }
 
     private FacturasDTO mapToDTO(Facturas f) {
@@ -292,5 +298,35 @@ public class FacturasServiceImpl implements FacturasService {
         if (!Boolean.TRUE.equals(estadoFactura.getActivo())) {
             throw new ReglaNegocioException("El estado de factura seleccionado se encuentra inactivo.");
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SaldoFacturaDTO obtenerSaldo(Long idFactura) {
+        Facturas factura = facturasRepository.findById(idFactura)
+                .orElseThrow(() -> new RecursoNoEncontradoException("No existe la factura con ID: " + idFactura));
+
+        BigDecimal total = factura.getTotal() != null ? factura.getTotal() : BigDecimal.ZERO;
+        List<Pagos> pagos = pagosRepository.findByIdFactura(idFactura)
+                .stream()
+                .filter(p -> !Boolean.FALSE.equals(p.getActivo()))
+                .collect(Collectors.toList());
+        BigDecimal pagado = pagos.stream()
+                .map(p -> p.getMonto() != null ? p.getMonto() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal pendiente = total.subtract(pagado);
+        if (pendiente.compareTo(BigDecimal.ZERO) < 0) {
+            pendiente = BigDecimal.ZERO;
+        }
+
+        return new SaldoFacturaDTO(
+                factura.getIdFactura(),
+                factura.getIdPaciente(),
+                total,
+                pagado,
+                pendiente,
+                pagos.size(),
+                pendiente.compareTo(BigDecimal.ZERO) == 0
+        );
     }
 }

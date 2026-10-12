@@ -14,4 +14,8 @@ public interface AsignacionEnfermerosService {
     AsignacionEnfermerosDTO actualizar(AsignacionEnfermerosDTO dto, Long id);
 
     void eliminar(Long id);
+
+    List<AsignacionEnfermerosDTO> findByEnfermero(Long idEnfermero);
+
+    List<AsignacionEnfermerosDTO> findByHospitalizacion(Long idHospitalizacion);
 }

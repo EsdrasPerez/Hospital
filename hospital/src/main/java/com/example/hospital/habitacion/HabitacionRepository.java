@@ -26,4 +26,6 @@ public interface HabitacionRepository extends JpaRepository<Habitacion, Long> {
 
     // Regla de integridad: verificar si existen habitaciones asignadas a un tipo de habitacion
     boolean existsByIdTipoHabitacion(Long idTipoHabitacion);
+
+    long countByIdEstadoHabitacionAndActivoTrue(Long idEstadoHabitacion);
 }

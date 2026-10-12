@@ -1,5 +1,9 @@
 package com.example.hospital.citas;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
 import com.example.hospital.citas.dto.CitasDTO;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -12,6 +16,11 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/citas")
+@Tag(name = "Citas", description = "Programación y seguimiento de citas médicas")
+@ApiResponses({
+        @ApiResponse(responseCode = "401", description = "Token ausente, inválido o expirado"),
+        @ApiResponse(responseCode = "403", description = "El rol del usuario no tiene permiso")
+})
 public class CitasController {
 
     private final CitasService citasService;
@@ -21,6 +30,7 @@ public class CitasController {
     }
 
     @GetMapping
+    @Operation(summary = "Listar citas (con filtros)", description = "Devuelve las citas. Filtros opcionales (se aplica el primero que venga):\n- `idPaciente`: citas de un paciente\n- `idMedico`: citas de un médico\n- `fecha` (yyyy-MM-dd): citas de un día\n- `soloActivas=true`: solo citas activas\n\nSin filtros devuelve todas.\n\nAcceso: cualquier usuario autenticado.")
     public List<CitasDTO> findAll(
             @RequestParam(required = false, defaultValue = "false") boolean soloActivas,
             @RequestParam(required = false) Long idPaciente,
@@ -41,13 +51,23 @@ public class CitasController {
         return citasService.findAll();
     }
 
+    @GetMapping("/agenda")
+    @Operation(summary = "Agenda diaria de un médico", description = "**Nuevo.** Devuelve las citas activas de un médico para un día, ordenadas por hora. Si no se envía `fecha`, usa el día de hoy. Responde 404 si el médico no existe.\n\nAcceso: cualquier usuario autenticado.")
+    public List<CitasDTO> agendaMedico(
+            @RequestParam Long idMedico,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+        return citasService.agendaMedico(idMedico, fecha);
+    }
+
     @GetMapping("/{id}")
+    @Operation(summary = "Obtener cita por ID", description = "Devuelve el detalle de una cita. Responde 404 si no existe.\n\nAcceso: cualquier usuario autenticado.")
     public CitasDTO findById(@PathVariable Long id) {
         return citasService.findById(id);
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'RECEPCIONISTA')")
     @PostMapping
+    @Operation(summary = "Programar cita", description = "Crea una nueva cita para un paciente con un médico. Valida que paciente y médico existan y estén activos, y que el médico no tenga otra cita a la misma fecha y hora.\n\nRoles permitidos: ADMIN, RECEPCIONISTA.")
     public ResponseEntity<CitasDTO> save(@RequestBody CitasDTO dto) {
         CitasDTO creada = citasService.crear(dto);
         return new ResponseEntity<>(creada, HttpStatus.CREATED);
@@ -55,6 +75,7 @@ public class CitasController {
 
     @PreAuthorize("hasAnyRole('ADMIN', 'RECEPCIONISTA')")
     @PutMapping("/{id}")
+    @Operation(summary = "Reprogramar / actualizar cita", description = "Modifica fecha, hora, motivo, médico o paciente de una cita, validando de nuevo choques de horario del médico.\n\nRoles permitidos: ADMIN, RECEPCIONISTA.")
     public ResponseEntity<CitasDTO> update(
             @PathVariable Long id,
             @RequestBody CitasDTO dto) {
@@ -64,6 +85,7 @@ public class CitasController {
 
     @PreAuthorize("hasAnyRole('ADMIN', 'RECEPCIONISTA', 'MEDICO')")
     @PatchMapping("/{id}/estado/{nuevoIdEstado}")
+    @Operation(summary = "Cambiar estado de la cita", description = "Mueve la cita a otro estado (p. ej. Programada → Confirmada → Atendida, o Cancelada). Solo permite transiciones válidas según las reglas de `estado-cita`.\n\nRoles permitidos: ADMIN, RECEPCIONISTA, MEDICO.")
     public ResponseEntity<CitasDTO> cambiarEstado(
             @PathVariable Long id,
             @PathVariable Long nuevoIdEstado) {
@@ -73,6 +95,7 @@ public class CitasController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
+    @Operation(summary = "Eliminar cita", description = "Desactiva una cita (borrado lógico).\n\nRoles permitidos: ADMIN.")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         citasService.eliminar(id);
         return ResponseEntity.noContent().build();

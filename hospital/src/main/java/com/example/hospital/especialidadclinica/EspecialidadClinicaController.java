@@ -1,5 +1,9 @@
 package com.example.hospital.especialidadclinica;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
 import com.example.hospital.especialidadclinica.dto.EspecialidadClinicaDTO;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -10,6 +14,11 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/especialidad-clinica")
+@Tag(name = "Especialidad de clínica", description = "Especialidades que se atienden en cada clínica")
+@ApiResponses({
+        @ApiResponse(responseCode = "401", description = "Token ausente, inválido o expirado"),
+        @ApiResponse(responseCode = "403", description = "El rol del usuario no tiene permiso")
+})
 public class EspecialidadClinicaController {
 
     private final EspecialidadClinicaService especialidadClinicaService;
@@ -19,6 +28,7 @@ public class EspecialidadClinicaController {
     }
 
     @GetMapping
+    @Operation(summary = "Listar especialidades de clínica", description = "Devuelve las especialidades por clínica. Con `soloActivas=true` solo las activas.\n\nAcceso: cualquier usuario autenticado.")
     public List<EspecialidadClinicaDTO> findAll(@RequestParam(required = false, defaultValue = "false") boolean soloActivas) {
         if (soloActivas) {
             return especialidadClinicaService.findActivas();
@@ -27,12 +37,14 @@ public class EspecialidadClinicaController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Obtener especialidad de clínica por ID", description = "Devuelve el detalle de una especialidad de clínica.\n\nAcceso: cualquier usuario autenticado.")
     public EspecialidadClinicaDTO findById(@PathVariable Long id) {
         return especialidadClinicaService.findById(id);
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
+    @Operation(summary = "Registrar especialidad de clínica", description = "Crea una nueva especialidad para una clínica.\n\nRoles permitidos: ADMIN.")
     public ResponseEntity<EspecialidadClinicaDTO> save(@RequestBody EspecialidadClinicaDTO dto) {
         EspecialidadClinicaDTO creada = especialidadClinicaService.crear(dto);
         return new ResponseEntity<>(creada, HttpStatus.CREATED);
@@ -40,6 +52,7 @@ public class EspecialidadClinicaController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
+    @Operation(summary = "Actualizar especialidad de clínica", description = "Modifica una especialidad de clínica.\n\nRoles permitidos: ADMIN.")
     public ResponseEntity<EspecialidadClinicaDTO> update(
             @PathVariable Long id,
             @RequestBody EspecialidadClinicaDTO dto) {
@@ -49,6 +62,7 @@ public class EspecialidadClinicaController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
+    @Operation(summary = "Eliminar especialidad de clínica", description = "Desactiva una especialidad de clínica.\n\nRoles permitidos: ADMIN.")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         especialidadClinicaService.eliminar(id);
         return ResponseEntity.noContent().build();

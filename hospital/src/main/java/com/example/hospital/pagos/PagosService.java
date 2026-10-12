@@ -14,4 +14,8 @@ public interface PagosService {
     PagosDTO actualizar(PagosDTO dto, Long id);
 
     void eliminar(Long id);
+
+    List<PagosDTO> findByFactura(Long idFactura);
+
+    List<PagosDTO> findByCuenta(Long idCuenta);
 }

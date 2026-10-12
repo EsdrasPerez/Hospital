@@ -26,4 +26,6 @@ public interface CitasService {
     CitasDTO cambiarEstado(Long id, Long nuevoIdEstado);
 
     void eliminar(Long id);
+
+    List<CitasDTO> agendaMedico(Long idMedico, LocalDate fecha);
 }

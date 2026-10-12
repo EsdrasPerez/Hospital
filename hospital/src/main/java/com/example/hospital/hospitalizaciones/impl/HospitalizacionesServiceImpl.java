@@ -327,4 +327,25 @@ public class HospitalizacionesServiceImpl implements HospitalizacionesService {
         existente.setActivo(false);
         hospitalizacionesRepository.save(existente);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<HospitalizacionesDTO> findActivas() {
+        return hospitalizacionesRepository.findByIdEstadoHosp(ESTADO_HOSP_ACTIVA)
+                .stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<HospitalizacionesDTO> findByPaciente(Long idPaciente) {
+        if (!pacienteRepository.existsById(idPaciente)) {
+            throw new RecursoNoEncontradoException("No existe el paciente con ID: " + idPaciente);
+        }
+        return hospitalizacionesRepository.findByIdPaciente(idPaciente)
+                .stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
 }

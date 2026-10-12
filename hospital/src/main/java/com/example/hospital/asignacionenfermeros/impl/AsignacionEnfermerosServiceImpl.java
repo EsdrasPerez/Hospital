@@ -223,4 +223,26 @@ public class AsignacionEnfermerosServiceImpl implements AsignacionEnfermerosServ
         existente.setActivo(false);
         asignacionEnfermerosRepository.save(existente);
     }
+
+    @Override
+    public List<AsignacionEnfermerosDTO> findByEnfermero(Long idEnfermero) {
+        if (!enfermerosRepository.existsById(idEnfermero)) {
+            throw new RecursoNoEncontradoException("No existe el enfermero con ID: " + idEnfermero);
+        }
+        return asignacionEnfermerosRepository.findByIdEnfermero(idEnfermero)
+                .stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<AsignacionEnfermerosDTO> findByHospitalizacion(Long idHospitalizacion) {
+        if (!hospitalizacionesRepository.existsById(idHospitalizacion)) {
+            throw new RecursoNoEncontradoException("No existe la hospitalización con ID: " + idHospitalizacion);
+        }
+        return asignacionEnfermerosRepository.findByIdHospitalizacion(idHospitalizacion)
+                .stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
 }

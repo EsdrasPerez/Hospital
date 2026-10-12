@@ -6,6 +6,8 @@ import com.example.hospital.usuarios.Usuarios;
 import com.example.hospital.usuarios.UsuariosRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;

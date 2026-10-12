@@ -297,4 +297,19 @@ public class CitasServiceImpl implements CitasService {
         existente.setActivo(false);
         citasRepository.save(existente);
     }
+
+    @Override
+    public List<CitasDTO> agendaMedico(Long idMedico, LocalDate fecha) {
+        if (idMedico == null) {
+            throw new IllegalArgumentException("El ID del médico es obligatorio");
+        }
+        if (!medicoRepository.existsById(idMedico)) {
+            throw new RecursoNoEncontradoException("No existe el médico con ID: " + idMedico);
+        }
+        LocalDate dia = (fecha != null) ? fecha : LocalDate.now();
+        return citasRepository.findByIdMedicoAndFechaAndActivoTrueOrderByHoraAsc(idMedico, dia)
+                .stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
 }

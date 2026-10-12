@@ -17,4 +17,8 @@ public interface HospitalizacionesService {
     HospitalizacionesDTO darAlta(Long id, LocalDateTime fechaAlta);
 
     void eliminar(Long id);
+
+    List<HospitalizacionesDTO> findActivas();
+
+    List<HospitalizacionesDTO> findByPaciente(Long idPaciente);
 }

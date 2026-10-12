@@ -31,7 +31,7 @@ public class PacienteController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','MEDICO','ENFERMERO','RECEPCIONISTA')")
-    @Operation(summary = "Listar pacientes activos o buscar por criterio")
+    @Operation(summary = "Listar / buscar pacientes", description = "Devuelve los pacientes activos. Parámetros opcionales:\n- `q`: busca por nombre, apellido paterno o DPI (coincidencia parcial)\n- `todos=true`: incluye también los pacientes inactivos\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA.")
     @ApiResponse(responseCode = "200", description = "Lista de pacientes")
     public List<PacienteResponse> listar(
             @RequestParam(required = false, defaultValue = "false") boolean todos,
@@ -47,7 +47,7 @@ public class PacienteController {
 
     @GetMapping("/dpi/{dpi}")
     @PreAuthorize("hasAnyRole('ADMIN','MEDICO','ENFERMERO','RECEPCIONISTA')")
-    @Operation(summary = "Obtener un paciente por su DPI")
+    @Operation(summary = "Obtener paciente por DPI", description = "Busca un paciente activo por su DPI exacto (13 dígitos). Útil en recepción para identificar rápidamente al paciente.\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Paciente encontrado"),
             @ApiResponse(responseCode = "404", description = "El paciente no existe")
@@ -58,7 +58,7 @@ public class PacienteController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','MEDICO','ENFERMERO','RECEPCIONISTA')")
-    @Operation(summary = "Obtener un paciente por id")
+    @Operation(summary = "Obtener paciente por ID", description = "Devuelve los datos de un paciente activo. Responde 404 si no existe o está inactivo.\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Paciente encontrado"),
             @ApiResponse(responseCode = "404", description = "El paciente no existe")
@@ -69,7 +69,7 @@ public class PacienteController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','RECEPCIONISTA')")
-    @Operation(summary = "Registrar un paciente")
+    @Operation(summary = "Registrar paciente", description = "Registra un nuevo paciente. Valida DPI y correo únicos, fecha de nacimiento coherente y que la alergia y el tipo de sangre existan y estén activos. La fecha de registro la asigna el servidor.\n\nRoles permitidos: ADMIN, RECEPCIONISTA.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Paciente creado"),
             @ApiResponse(responseCode = "400", description = "Datos inválidos"),
@@ -85,7 +85,7 @@ public class PacienteController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','RECEPCIONISTA')")
-    @Operation(summary = "Actualizar un paciente")
+    @Operation(summary = "Actualizar paciente", description = "Modifica los datos de un paciente aplicando las mismas validaciones que en el registro.\n\nRoles permitidos: ADMIN, RECEPCIONISTA.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Paciente actualizado"),
             @ApiResponse(responseCode = "400", description = "Datos inválidos"),
@@ -100,7 +100,7 @@ public class PacienteController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Desactivar un paciente (borrado lógico)")
+    @Operation(summary = "Desactivar paciente", description = "Borrado lógico del paciente. No se permite si tiene citas activas, una hospitalización en curso, un registro activo en emergencia o cuentas activas.\n\nRoles permitidos: ADMIN.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Paciente desactivado"),
             @ApiResponse(responseCode = "404", description = "El paciente no existe")
