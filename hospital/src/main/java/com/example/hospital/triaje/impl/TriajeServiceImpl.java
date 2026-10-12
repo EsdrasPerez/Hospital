@@ -1,0 +1,106 @@
+package com.example.hospital.triaje.impl;
+
+import com.example.hospital.triaje.Triaje;
+import com.example.hospital.triaje.TriajeRepository;
+import com.example.hospital.triaje.TriajeService;
+import com.example.hospital.triaje.dto.TriajeDTO;
+import com.example.hospital.shared.exception.DuplicadoException;
+import com.example.hospital.shared.exception.RecursoNoEncontradoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+public class TriajeServiceImpl implements TriajeService {
+
+    private final TriajeRepository triajeRepository;
+
+    public TriajeServiceImpl(TriajeRepository triajeRepository) {
+        this.triajeRepository = triajeRepository;
+    }
+
+    private TriajeDTO mapToDTO(Triaje e) {
+        return new TriajeDTO(
+                e.getIdTriaje(),
+                e.getNivelDeEmergencia(),
+                e.getDescripcion(),
+                e.getActivo()
+        );
+    }
+
+    private void validar(TriajeDTO dto, Long idActual) {
+        if (dto == null) {
+            throw new ReglaNegocioException("Los datos de el triaje son requeridos");
+        }
+        if (dto.nivelDeEmergencia() == null || dto.nivelDeEmergencia().isBlank()) {
+            throw new ReglaNegocioException("El nivel de emergencia es obligatorio");
+        }
+        String nivel = dto.nivelDeEmergencia().trim();
+        boolean duplicado = idActual == null
+                ? triajeRepository.existsByNivelDeEmergenciaIgnoreCase(nivel)
+                : triajeRepository.existsByNivelDeEmergenciaIgnoreCaseAndIdTriajeNot(nivel, idActual);
+        if (duplicado) {
+            throw new DuplicadoException("Ya existe un triaje con el nivel " + nivel);
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TriajeDTO> findAll() {
+        return triajeRepository.findAll()
+                .stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TriajeDTO findById(Long id) {
+        return mapToDTO(buscar(id));
+    }
+
+    @Override
+    @Transactional
+    public TriajeDTO crear(TriajeDTO dto) {
+        validar(dto, null);
+        Triaje entity = new Triaje();
+        entity.setNivelDeEmergencia(dto.nivelDeEmergencia().trim());
+        entity.setDescripcion(dto.descripcion());
+        entity.setActivo(dto.activo() != null ? dto.activo() : true);
+        return mapToDTO(triajeRepository.save(entity));
+    }
+
+    @Override
+    @Transactional
+    public TriajeDTO actualizar(TriajeDTO dto, Long id) {
+        Triaje existente = buscar(id);
+        validar(dto, id);
+        Triaje entity = existente;
+        entity.setNivelDeEmergencia(dto.nivelDeEmergencia().trim());
+        entity.setDescripcion(dto.descripcion());
+        if (dto.activo() != null) {
+            entity.setActivo(dto.activo());
+        }
+        return mapToDTO(triajeRepository.save(entity));
+    }
+
+    @Override
+    @Transactional
+    public void eliminar(Long id) {
+        Triaje existente = buscar(id);
+        // Eliminación lógica para conservar el historial
+        existente.setActivo(false);
+        triajeRepository.save(existente);
+    }
+
+    private Triaje buscar(Long id) {
+        if (id == null) {
+            throw new ReglaNegocioException("El ID de el triaje es obligatorio");
+        }
+        return triajeRepository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("No existe el triaje con ID: " + id));
+    }
+}
