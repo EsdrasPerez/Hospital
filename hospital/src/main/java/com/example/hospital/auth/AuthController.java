@@ -6,6 +6,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import com.example.hospital.auth.dto.LoginRequest;
 import com.example.hospital.auth.dto.LoginResponse;
+import com.example.hospital.auth.dto.RegisterRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -27,26 +29,28 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @Operation(summary = "Iniciar sesión", description = "Recibe usuario y contraseña y, si son válidos, devuelve un token JWT. Ese token se envía en el encabezado `Authorization: Bearer <token>` en el resto de peticiones (en Swagger, botón **Authorize**). Responde 401 si las credenciales son inválidas.\n\nAcceso: público (no requiere token).")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-        try {
-            LoginResponse response = authService.login(request);
-            return ResponseEntity.ok(response);
-        } catch (org.springframework.security.core.AuthenticationException e) {
-            return ResponseEntity.status(401).body("Error: Credenciales inválidas. " + e.getMessage());
-        }
+    @Operation(summary = "Iniciar sesión", description = "Recibe usuario y contraseña y, si son válidos, devuelve un token JWT. Ese token se envía en el encabezado `Authorization: Bearer <token>` en el resto de peticiones (en Swagger, botón **Authorize**). Responde 400 si faltan campos y 401 (con el formato de error estándar) si las credenciales son inválidas o el usuario está inactivo.\n\nAcceso: público (no requiere token).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Token JWT generado"),
+            @ApiResponse(responseCode = "400", description = "Faltan usuario o contraseña"),
+            @ApiResponse(responseCode = "401", description = "Credenciales inválidas")
+    })
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        return ResponseEntity.ok(authService.login(request));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/register")
-    @Operation(summary = "Registrar usuario", description = "Crea un nuevo usuario de acceso al sistema con contraseña cifrada. Responde 400 si el nombre de usuario ya existe.\n\nRoles permitidos: ADMIN.")
-    public ResponseEntity<?> register(@RequestBody LoginRequest request) {
-        try {
-            authService.register(request);
-            return ResponseEntity.ok("Usuario '" + request.username() + "' creado exitosamente.");
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
-        }
+    @Operation(summary = "Registrar usuario", description = "Crea un nuevo usuario de acceso al sistema con contraseña cifrada. El campo `rol` (nombre del rol) es obligatorio. Responde 400 si faltan datos (incluido el rol), 409 si el usuario ya existe y 422 si el rol no existe o está inactivo.\n\nRoles permitidos: ADMIN.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Usuario creado"),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos o rol ausente"),
+            @ApiResponse(responseCode = "409", description = "El usuario ya existe"),
+            @ApiResponse(responseCode = "422", description = "Rol inexistente o inactivo")
+    })
+    public ResponseEntity<Map<String, String>> register(@Valid @RequestBody RegisterRequest request) {
+        authService.register(request);
+        return ResponseEntity.ok(Map.of("message", "Usuario '" + request.username() + "' creado exitosamente."));
     }
 
     @GetMapping("/me")

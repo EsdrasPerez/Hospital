@@ -31,13 +31,13 @@ public class PacienteController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','MEDICO','ENFERMERO','RECEPCIONISTA')")
-    @Operation(summary = "Listar / buscar pacientes", description = "Devuelve los pacientes activos. Parámetros opcionales:\n- `q`: busca por nombre, apellido paterno o DPI (coincidencia parcial)\n- `todos=true`: incluye también los pacientes inactivos\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA.")
+    @Operation(summary = "Listar / buscar pacientes", description = "Devuelve los pacientes activos. Parámetros opcionales:\n- `q`: busca por nombre, apellido paterno, apellido materno o DPI (coincidencia parcial, sin distinguir mayúsculas)\n- `todos=true`: incluye también los pacientes inactivos (también cuando se usa junto con `q`)\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA.")
     @ApiResponse(responseCode = "200", description = "Lista de pacientes")
     public List<PacienteResponse> listar(
             @RequestParam(required = false, defaultValue = "false") boolean todos,
             @RequestParam(required = false) String q) {
         if (q != null && !q.trim().isEmpty()) {
-            return service.buscar(q);
+            return service.buscar(q, todos);
         }
         if (todos) {
             return service.listarTodos();
@@ -58,13 +58,13 @@ public class PacienteController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','MEDICO','ENFERMERO','RECEPCIONISTA')")
-    @Operation(summary = "Obtener paciente por ID", description = "Devuelve los datos de un paciente activo. Responde 404 si no existe o está inactivo.\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA.")
+    @Operation(summary = "Obtener paciente por ID", description = "Devuelve los datos de un paciente, activo o inactivo (el campo `activo` lo indica). Responde 404 solo si no existe.\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Paciente encontrado"),
             @ApiResponse(responseCode = "404", description = "El paciente no existe")
     })
     public PacienteResponse obtener(@PathVariable Long id) {
-        return service.obtener(id);
+        return service.obtenerDetalle(id);
     }
 
     @PostMapping
@@ -103,7 +103,8 @@ public class PacienteController {
     @Operation(summary = "Desactivar paciente", description = "Borrado lógico del paciente. No se permite si tiene citas activas, una hospitalización en curso, un registro activo en emergencia o cuentas activas.\n\nRoles permitidos: ADMIN.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Paciente desactivado"),
-            @ApiResponse(responseCode = "404", description = "El paciente no existe")
+            @ApiResponse(responseCode = "404", description = "El paciente no existe o ya está inactivo"),
+            @ApiResponse(responseCode = "422", description = "Tiene citas activas, hospitalización en curso, registro activo en emergencia o cuentas activas")
     })
     public void eliminar(@PathVariable Long id) {
         service.eliminar(id);

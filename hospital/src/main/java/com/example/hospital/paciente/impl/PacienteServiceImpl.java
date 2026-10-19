@@ -60,6 +60,13 @@ public class PacienteServiceImpl implements PacienteService {
 
     @Override
     @Transactional(readOnly = true)
+    public PacienteResponse obtenerDetalle(Long id) {
+        return mapper.toResponse(repository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Paciente " + id + " no encontrado")));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public PacienteResponse buscarPorDpi(String dpi) {
         if (dpi == null || dpi.trim().isEmpty()) {
             throw new ReglaNegocioException("El DPI de búsqueda no puede estar vacío");
@@ -72,13 +79,19 @@ public class PacienteServiceImpl implements PacienteService {
     @Override
     @Transactional(readOnly = true)
     public List<PacienteResponse> buscar(String criterio) {
+        return buscar(criterio, false);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PacienteResponse> buscar(String criterio, boolean todos) {
         if (criterio == null || criterio.trim().isEmpty()) {
-            return listar();
+            return todos ? listarTodos() : listar();
         }
         String valor = criterio.trim();
-        return repository.findByNombreContainingIgnoreCaseOrApellidoPaternoContainingIgnoreCaseOrDpiPacienteContaining(valor, valor, valor)
+        return repository.findByNombreContainingIgnoreCaseOrApellidoPaternoContainingIgnoreCaseOrApellidoMaternoContainingIgnoreCaseOrDpiPacienteContainingIgnoreCase(valor, valor, valor, valor)
                 .stream()
-                .filter(p -> Boolean.TRUE.equals(p.getActivo()))
+                .filter(p -> todos || Boolean.TRUE.equals(p.getActivo()))
                 .map(mapper::toResponse)
                 .toList();
     }

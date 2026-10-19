@@ -24,8 +24,8 @@ public interface PacienteRepository extends JpaRepository<Paciente, Long> {
 
     boolean existsByCorreoElectronicoAndIdPacienteNot(String correoElectronico, Long idPaciente);
 
-    List<Paciente> findByNombreContainingIgnoreCaseOrApellidoPaternoContainingIgnoreCaseOrDpiPacienteContaining(
-            String nombre, String apellidoPaterno, String dpiPaciente);
+    List<Paciente> findByNombreContainingIgnoreCaseOrApellidoPaternoContainingIgnoreCaseOrApellidoMaternoContainingIgnoreCaseOrDpiPacienteContainingIgnoreCase(
+            String nombre, String apellidoPaterno, String apellidoMaterno, String dpiPaciente);
 
     // RN-TS-02: Verificar si algún paciente tiene asignado este tipo de sangre
     boolean existsByIdTipoDeSangre(Long idTipoDeSangre);

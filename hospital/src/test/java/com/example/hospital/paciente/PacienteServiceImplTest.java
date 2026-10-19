@@ -8,6 +8,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.hospital.alergias.AlergiasRepository;
+import com.example.hospital.citas.CitasRepository;
+import com.example.hospital.cuentas.CuentasRepository;
+import com.example.hospital.emergencia.EmergenciaRepository;
+import com.example.hospital.hospitalizaciones.HospitalizacionesRepository;
 import com.example.hospital.paciente.dto.PacienteRequest;
 import com.example.hospital.paciente.dto.PacienteResponse;
 import com.example.hospital.paciente.impl.PacienteServiceImpl;
@@ -31,6 +35,10 @@ class PacienteServiceImplTest {
     @Mock PacienteRepository repository;
     @Mock AlergiasRepository alergiasRepository;
     @Mock TipoSangreRepository tipoSangreRepository;
+    @Mock CitasRepository citasRepository;
+    @Mock HospitalizacionesRepository hospitalizacionesRepository;
+    @Mock EmergenciaRepository emergenciaRepository;
+    @Mock CuentasRepository cuentasRepository;
     @Spy PacienteMapper mapper = new PacienteMapper();
     @InjectMocks PacienteServiceImpl service;
 
@@ -67,7 +75,7 @@ class PacienteServiceImplTest {
     @Test
     void crear_lanzaReglaNegocio_siElTipoDeSangreNoExiste() {
         when(repository.existsByDpiPaciente("2345678901234")).thenReturn(false);
-        when(tipoSangreRepository.existsById(99L)).thenReturn(false);
+        when(tipoSangreRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(ReglaNegocioException.class, () -> service.crear(request("2345678901234", 99L)));
 
@@ -95,11 +103,67 @@ class PacienteServiceImplTest {
     }
 
     @Test
+    void eliminar_lanzaReglaNegocio_siTieneCitasActivas_yNoGuarda() {
+        Paciente p = new Paciente();
+        p.setIdPaciente(1L);
+        when(repository.findByIdPacienteAndActivoTrue(1L)).thenReturn(Optional.of(p));
+        when(citasRepository.existsByIdPacienteAndActivoTrue(1L)).thenReturn(true);
+
+        assertThrows(ReglaNegocioException.class, () -> service.eliminar(1L));
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void eliminar_lanzaReglaNegocio_siTieneHospitalizacionActiva_yNoGuarda() {
+        Paciente p = new Paciente();
+        p.setIdPaciente(1L);
+        when(repository.findByIdPacienteAndActivoTrue(1L)).thenReturn(Optional.of(p));
+        when(hospitalizacionesRepository.existsByIdPacienteAndIdEstadoHosp(1L, 1L)).thenReturn(true);
+
+        assertThrows(ReglaNegocioException.class, () -> service.eliminar(1L));
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void listar_devuelveSoloLosActivos() {
         Paciente p = new Paciente();
         p.setIdPaciente(1L);
         when(repository.findByActivoTrue()).thenReturn(List.of(p));
 
         assertThat(service.listar()).hasSize(1);
+    }
+
+    @Test
+    void obtenerDetalle_devuelveTambienPacientesInactivos() {
+        Paciente p = new Paciente();
+        p.setIdPaciente(5L);
+        p.setActivo(false);
+        when(repository.findById(5L)).thenReturn(Optional.of(p));
+
+        assertThat(service.obtenerDetalle(5L).activo()).isFalse();
+    }
+
+    @Test
+    void obtenerDetalle_lanzaNoEncontrado_siNoExiste() {
+        when(repository.findById(9L)).thenReturn(Optional.empty());
+
+        assertThrows(RecursoNoEncontradoException.class, () -> service.obtenerDetalle(9L));
+    }
+
+    @Test
+    void buscar_conTodos_incluyeInactivos_ySinTodosSoloActivos() {
+        Paciente activo = new Paciente();
+        activo.setIdPaciente(1L);
+        activo.setActivo(true);
+        Paciente inactivo = new Paciente();
+        inactivo.setIdPaciente(2L);
+        inactivo.setActivo(false);
+        when(repository.findByNombreContainingIgnoreCaseOrApellidoPaternoContainingIgnoreCaseOrApellidoMaternoContainingIgnoreCaseOrDpiPacienteContainingIgnoreCase(
+                "ana", "ana", "ana", "ana")).thenReturn(List.of(activo, inactivo));
+
+        assertThat(service.buscar("ana", true)).hasSize(2);
+        assertThat(service.buscar("ana", false)).hasSize(1);
     }
 }
