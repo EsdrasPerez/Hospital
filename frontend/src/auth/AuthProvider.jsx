@@ -20,6 +20,9 @@ export function AuthProvider({ children }) {
   // Si hay token guardado, hay que consultar /me antes de decidir si hay sesión.
   const [cargando, setCargando] = useState(() => Boolean(obtenerToken()))
   const [sesionExpirada, setSesionExpirada] = useState(false)
+  // true cuando el usuario cerró sesión con el botón: ProtectedRoute no recuerda la página
+  // actual, así el siguiente usuario entra a Inicio y no a la última pantalla del anterior.
+  const [cerroSesion, setCerroSesion] = useState(false)
 
   // Ante cualquier 401 (fuera del login) el cliente HTTP avisa aquí.
   useEffect(() => {
@@ -58,6 +61,7 @@ export function AuthProvider({ children }) {
     try {
       const datos = await obtenerUsuarioActual()
       setSesionExpirada(false)
+      setCerroSesion(false)
       setUsuario(construirUsuario(datos))
     } catch (error) {
       borrarToken()
@@ -68,6 +72,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     borrarToken()
     setSesionExpirada(false)
+    setCerroSesion(true)
     setUsuario(null)
   }, [])
 
@@ -79,11 +84,12 @@ export function AuthProvider({ children }) {
       rol: usuario?.rol ?? null,
       cargando,
       sesionExpirada,
+      cerroSesion,
       login,
       logout,
       tieneRol,
     }),
-    [usuario, cargando, sesionExpirada, login, logout, tieneRol],
+    [usuario, cargando, sesionExpirada, cerroSesion, login, logout, tieneRol],
   )
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>

@@ -4,10 +4,12 @@ import { useAuth } from './useAuth.js'
 
 /** Exige sesión iniciada; si no, redirige a /login. */
 export default function ProtectedRoute() {
-  const { usuario, cargando } = useAuth()
+  const { usuario, cargando, cerroSesion } = useAuth()
   const location = useLocation()
 
   if (cargando) return <Loading pantallaCompleta texto="Verificando sesión..." />
-  if (!usuario) return <Navigate to="/login" replace state={{ desde: location.pathname }} />
+  if (!usuario) {
+    return <Navigate to="/login" replace state={cerroSesion ? null : { desde: location.pathname }} />
+  }
   return <Outlet />
 }

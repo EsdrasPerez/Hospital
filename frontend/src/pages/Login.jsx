@@ -33,7 +33,7 @@ export default function Login() {
     } catch (error) {
       const { status, message, detalles } = normalizarError(error)
       setErrores(detalles)
-      // El backend responde 401 con texto plano cuando las credenciales son incorrectas.
+      // 401 = credenciales incorrectas o usuario inactivo.
       setErrorGeneral(status === 401 ? 'Usuario o contraseña incorrectos.' : message)
     } finally {
       setEnviando(false)
