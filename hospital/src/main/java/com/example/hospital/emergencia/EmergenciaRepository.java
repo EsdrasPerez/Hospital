@@ -30,5 +30,7 @@ public interface EmergenciaRepository extends JpaRepository<Emergencia, Long> {
 
     boolean existsByIdTriaje(Long idTriaje);
 
+    boolean existsByIdTriajeAndActivoTrue(Long idTriaje);
+
     long countByActivoTrueAndFechaHoraAltaIsNull();
 }

@@ -1,7 +1,9 @@
 package com.example.hospital.diagnosticoconsulta.impl;
 
 import com.example.hospital.consultas.Consultas;
+import com.example.hospital.shared.exception.DuplicadoException;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.consultas.ConsultasRepository;
 import com.example.hospital.diagnosticoconsulta.DiagnosticoConsulta;
 import com.example.hospital.diagnosticoconsulta.DiagnosticoConsultaRepository;
@@ -48,7 +50,7 @@ public class DiagnosticoConsultaServiceImpl implements DiagnosticoConsultaServic
     @Override
     public List<DiagnosticoConsultaDTO> findByConsulta(Long idConsulta) {
         if (idConsulta == null) {
-            throw new IllegalArgumentException("El ID de consulta es obligatorio");
+            throw new ReglaNegocioException("El ID de consulta es obligatorio");
         }
         return diagnosticoConsultaRepository.findByIdConsulta(idConsulta)
                 .stream()
@@ -59,7 +61,7 @@ public class DiagnosticoConsultaServiceImpl implements DiagnosticoConsultaServic
     @Override
     public List<DiagnosticoConsultaDTO> findByDiagnostico(Long idDiagnostico) {
         if (idDiagnostico == null) {
-            throw new IllegalArgumentException("El ID de diagnóstico es obligatorio");
+            throw new ReglaNegocioException("El ID de diagnóstico es obligatorio");
         }
         return diagnosticoConsultaRepository.findByIdDiagnostico(idDiagnostico)
                 .stream()
@@ -70,7 +72,7 @@ public class DiagnosticoConsultaServiceImpl implements DiagnosticoConsultaServic
     @Override
     public DiagnosticoConsultaDTO findById(Long idDiagnostico, Long idConsulta) {
         if (idDiagnostico == null || idConsulta == null) {
-            throw new IllegalArgumentException("Ambos identificadores (idDiagnostico e idConsulta) son obligatorios");
+            throw new ReglaNegocioException("Ambos identificadores (idDiagnostico e idConsulta) son obligatorios");
         }
         DiagnosticoConsulta.DiagnosticoConsultaId id =
                 new DiagnosticoConsulta.DiagnosticoConsultaId(idDiagnostico, idConsulta);
@@ -85,28 +87,28 @@ public class DiagnosticoConsultaServiceImpl implements DiagnosticoConsultaServic
     @Transactional
     public DiagnosticoConsultaDTO crear(DiagnosticoConsultaDTO dto) {
         if (dto == null || dto.idDiagnostico() == null || dto.idConsulta() == null) {
-            throw new IllegalArgumentException("Los IDs de diagnóstico y de consulta son obligatorios");
+            throw new ReglaNegocioException("Los IDs de diagnóstico y de consulta son obligatorios");
         }
 
         // 1. Validar que la consulta exista y esté activa
         Consultas consulta = consultasRepository.findById(dto.idConsulta())
-                .orElseThrow(() -> new IllegalArgumentException("La consulta con ID " + dto.idConsulta() + " no existe"));
+                .orElseThrow(() -> new ReglaNegocioException("La consulta con ID " + dto.idConsulta() + " no existe"));
 
         if (consulta.getActivo() != null && !consulta.getActivo()) {
-            throw new IllegalArgumentException("La consulta médica seleccionada se encuentra inactiva");
+            throw new ReglaNegocioException("La consulta médica seleccionada se encuentra inactiva");
         }
 
         // 2. Validar que el diagnóstico exista y esté activo
         Diagnosticos diagnostico = diagnosticosRepository.findById(dto.idDiagnostico())
-                .orElseThrow(() -> new IllegalArgumentException("El diagnóstico con ID " + dto.idDiagnostico() + " no existe"));
+                .orElseThrow(() -> new ReglaNegocioException("El diagnóstico con ID " + dto.idDiagnostico() + " no existe"));
 
         if (diagnostico.getActivo() != null && !diagnostico.getActivo()) {
-            throw new IllegalArgumentException("El diagnóstico médico seleccionado se encuentra inactivo");
+            throw new ReglaNegocioException("El diagnóstico médico seleccionado se encuentra inactivo");
         }
 
         // 3. Validar que no se duplique el par (idDiagnostico, idConsulta)
         if (diagnosticoConsultaRepository.existsByIdDiagnosticoAndIdConsulta(dto.idDiagnostico(), dto.idConsulta())) {
-            throw new IllegalArgumentException("El diagnóstico ya fue asignado previamente a esta consulta");
+            throw new DuplicadoException("El diagnóstico ya fue asignado previamente a esta consulta");
         }
 
         DiagnosticoConsulta entity = new DiagnosticoConsulta(dto.idDiagnostico(), dto.idConsulta());
@@ -118,7 +120,7 @@ public class DiagnosticoConsultaServiceImpl implements DiagnosticoConsultaServic
     @Transactional
     public void eliminar(Long idDiagnostico, Long idConsulta) {
         if (idDiagnostico == null || idConsulta == null) {
-            throw new IllegalArgumentException("Ambos IDs son obligatorios para remover la asociación");
+            throw new ReglaNegocioException("Ambos IDs son obligatorios para remover la asociación");
         }
 
         DiagnosticoConsulta.DiagnosticoConsultaId id =

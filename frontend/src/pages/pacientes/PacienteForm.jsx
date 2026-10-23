@@ -89,12 +89,12 @@ export default function PacienteForm() {
 
   if (errorCarga) {
     return (
-      <div className="space-y-4">
+      <div>
         <ErrorAlert
           titulo={errorCarga.status === 404 ? 'Paciente no encontrado' : 'No se pudo cargar el formulario'}
           mensaje={errorCarga.message}
         />
-        <Link to="/pacientes" className="text-sm font-medium text-teal-800 hover:underline">
+        <Link to="/pacientes" className="volver-enlace">
           &larr; Volver a pacientes
         </Link>
       </div>
@@ -105,18 +105,18 @@ export default function PacienteForm() {
     lista.filter((x) => x.activo !== false).map((x) => ({ valor: String(x[clave]), etiqueta: x.nombre }))
 
   return (
-    <div className="space-y-4">
-      <Link to={esEdicion ? `/pacientes/${id}` : '/pacientes'} className="text-sm font-medium text-teal-800 hover:underline">
+    <div>
+      <Link to={esEdicion ? `/pacientes/${id}` : '/pacientes'} className="volver-enlace">
         &larr; {esEdicion ? 'Volver al detalle' : 'Volver a pacientes'}
       </Link>
-      <h1 className="text-2xl font-semibold text-slate-900">
+      <h1 className="h3 mb-0">
         {esEdicion ? `Editar paciente: ${nombreCompleto(form)}` : 'Nuevo paciente'}
       </h1>
 
-      <form onSubmit={enviar} noValidate className="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <form onSubmit={enviar} noValidate className="card card-body">
         <ErrorAlert mensaje={errorGeneral} />
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="row">
           <FormField
             nombre="dpiPaciente"
             etiqueta="DPI"
@@ -214,7 +214,7 @@ export default function PacienteForm() {
             error={errores.idAlergias}
           />
           <FormField
-            className="sm:col-span-2"
+            className="col-12"
             nombre="direccion"
             etiqueta="Dirección"
             tipo="textarea"
@@ -225,17 +225,17 @@ export default function PacienteForm() {
           />
         </div>
 
-        <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+        <div className="acciones-grupo d-flex justify-content-end border-top pt-3">
           <Link
             to={esEdicion ? `/pacientes/${id}` : '/pacientes'}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="btn btn-secondary btn-round"
           >
             Cancelar
           </Link>
           <button
             type="submit"
             disabled={guardando}
-            className="rounded-lg bg-teal-700 px-5 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60"
+            className="btn btn-primary btn-round"
           >
             {guardando ? 'Guardando...' : esEdicion ? 'Guardar cambios' : 'Registrar paciente'}
           </button>

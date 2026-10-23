@@ -2,6 +2,7 @@ package com.example.hospital.paciente;
 
 import com.example.hospital.paciente.dto.PacienteRequest;
 import com.example.hospital.paciente.dto.PacienteResponse;
+import com.example.hospital.paciente.dto.PacienteResumenDTO;
 import com.example.hospital.shared.constants.ApiConstants;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -43,6 +44,27 @@ public class PacienteController {
             return service.listarTodos();
         }
         return service.listar();
+    }
+
+    // Mínimo privilegio para caja: CAJERO no puede leer el listado ni el detalle completo de pacientes, pero necesita identificar
+    // al paciente al emitir facturas y cuentas. Estos endpoints devuelven SOLO id, nombre completo y DPI.
+    // (Las rutas literales "/busqueda" y "/{id}/resumen" no chocan con "/{id}": Spring prefiere la coincidencia literal.)
+    @GetMapping("/busqueda")
+    @PreAuthorize("hasAnyRole('ADMIN','CAJERO','RECEPCIONISTA')")
+    @Operation(summary = "Búsqueda mínima de pacientes (caja)", description = "Busca pacientes ACTIVOS por nombre, apellidos o DPI (parcial, sin distinguir mayúsculas) y devuelve solo `idPaciente`, `nombreCompleto`, `dpiPaciente` y `activo`. NO expone teléfono, correo, dirección ni datos clínicos. `q` con menos de 2 caracteres devuelve lista vacía (200). Máximo 20 resultados, ordenados por nombre.\n\nJustificación: mínimo privilegio; permite a CAJERO identificar al paciente en facturas y cuentas sin darle acceso al listado completo.\n\nRoles permitidos: ADMIN, CAJERO, RECEPCIONISTA.")
+    public List<PacienteResumenDTO> busqueda(@RequestParam(required = false) String q) {
+        return service.buscarResumen(q);
+    }
+
+    @GetMapping("/{id}/resumen")
+    @PreAuthorize("hasAnyRole('ADMIN','CAJERO','RECEPCIONISTA')")
+    @Operation(summary = "Resumen mínimo de un paciente (caja)", description = "Devuelve solo `idPaciente`, `nombreCompleto`, `dpiPaciente` y `activo` de un paciente (activo o inactivo), para mostrar su nombre en facturas, cuentas y pagos. Responde 404 solo si no existe.\n\nJustificación: mínimo privilegio para caja.\n\nRoles permitidos: ADMIN, CAJERO, RECEPCIONISTA.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Resumen del paciente"),
+            @ApiResponse(responseCode = "404", description = "El paciente no existe")
+    })
+    public PacienteResumenDTO resumen(@PathVariable Long id) {
+        return service.resumen(id);
     }
 
     @GetMapping("/dpi/{dpi}")

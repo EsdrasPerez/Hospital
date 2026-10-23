@@ -4,21 +4,14 @@ import { listarAlergias, listarTiposSangre } from '../../api/catalogos.js'
 import { desactivarPaciente, obtenerPaciente } from '../../api/pacientes.js'
 import { useAuth } from '../../auth/useAuth.js'
 import ConfirmDialog from '../../components/ConfirmDialog.jsx'
+import Dato from '../../components/Dato.jsx'
 import ErrorAlert from '../../components/ErrorAlert.jsx'
 import Loading from '../../components/Loading.jsx'
 import { puede } from '../../config/menu.js'
+import PacienteHospitalizaciones from '../hospitalizaciones/PacienteHospitalizaciones.jsx'
 import { normalizarError } from '../../utils/errores.js'
 import { calcularEdad, formatearFecha, formatearFechaHora } from '../../utils/formato.js'
 import { nombreCompleto } from './utilsPaciente.js'
-
-function Dato({ etiqueta, children }) {
-  return (
-    <div>
-      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{etiqueta}</dt>
-      <dd className="mt-1 text-sm text-slate-900">{children || '—'}</dd>
-    </div>
-  )
-}
 
 export default function PacienteDetalle() {
   const { id } = useParams()
@@ -90,12 +83,12 @@ export default function PacienteDetalle() {
 
   if (error) {
     return (
-      <div className="space-y-4">
+      <div>
         <ErrorAlert
           titulo={error.status === 404 ? 'Paciente no encontrado' : 'No se pudo cargar el paciente'}
           mensaje={error.message}
         />
-        <Link to="/pacientes" className="text-sm font-medium text-teal-800 hover:underline">
+        <Link to="/pacientes" className="volver-enlace">
           &larr; Volver a pacientes
         </Link>
       </div>
@@ -107,28 +100,33 @@ export default function PacienteDetalle() {
   const puedeEditar = puedeEditarRol && estaActivo
   const puedeDesactivar = puedeDesactivarRol && estaActivo
   return (
-    <div className="space-y-4">
-      <Link to="/pacientes" className="text-sm font-medium text-teal-800 hover:underline">
+    <div>
+      <Link to="/pacientes" className="volver-enlace">
         &larr; Volver a pacientes
       </Link>
 
       <ErrorAlert tipo="exito" mensaje={exito} onCerrar={() => setExito('')} />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="card card-body d-flex flex-column flex-md-row align-items-md-center justify-content-md-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">{nombreCompleto(p)}</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="h3 mb-0">{nombreCompleto(p)}</h1>
+          <p className="text-muted mb-0">
             DPI {p.dpiPaciente}
             {!estaActivo && (
-              <span className="ml-2 rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-medium text-slate-600">Inactivo</span>
+              <span className="badge badge-secondary ml-2">Inactivo</span>
             )}
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="acciones-grupo d-flex">
+          {puede(rol, 'facturas', 'ver') && (
+            <Link to={`/facturas?idPaciente=${p.idPaciente}`} className="btn btn-outline-secondary btn-round">
+              Facturas
+            </Link>
+          )}
           {puedeEditar && (
             <Link
               to={`/pacientes/${p.idPaciente}/editar`}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="btn btn-secondary btn-round"
             >
               Editar
             </Link>
@@ -140,7 +138,7 @@ export default function PacienteDetalle() {
                 setErrorDesactivar('')
                 setConfirmando(true)
               }}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              className="btn btn-danger btn-round"
             >
               Desactivar
             </button>
@@ -148,8 +146,8 @@ export default function PacienteDetalle() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <dl className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="card card-body">
+        <div className="row">
           <Dato etiqueta="Nombre">{p.nombre}</Dato>
           <Dato etiqueta="Apellido paterno">{p.apellidoPaterno}</Dato>
           <Dato etiqueta="Apellido materno">{p.apellidoMaterno}</Dato>
@@ -164,8 +162,10 @@ export default function PacienteDetalle() {
           <Dato etiqueta="Alergia">{alergia || (p.idAlergias ? `ID ${p.idAlergias}` : '')}</Dato>
           <Dato etiqueta="Fecha de registro">{formatearFechaHora(p.fechaRegistro)}</Dato>
           <Dato etiqueta="Estado">{p.activo === false ? 'Inactivo' : 'Activo'}</Dato>
-        </dl>
+        </div>
       </div>
+
+      {puede(rol, 'hospitalizaciones', 'ver') && <PacienteHospitalizaciones idPaciente={p.idPaciente} />}
 
       <ConfirmDialog
         abierto={confirmando}

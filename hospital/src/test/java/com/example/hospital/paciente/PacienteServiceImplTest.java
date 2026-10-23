@@ -14,6 +14,7 @@ import com.example.hospital.emergencia.EmergenciaRepository;
 import com.example.hospital.hospitalizaciones.HospitalizacionesRepository;
 import com.example.hospital.paciente.dto.PacienteRequest;
 import com.example.hospital.paciente.dto.PacienteResponse;
+import com.example.hospital.paciente.dto.PacienteResumenDTO;
 import com.example.hospital.paciente.impl.PacienteServiceImpl;
 import com.example.hospital.shared.exception.DuplicadoException;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
@@ -165,5 +166,74 @@ class PacienteServiceImplTest {
 
         assertThat(service.buscar("ana", true)).hasSize(2);
         assertThat(service.buscar("ana", false)).hasSize(1);
+    }
+
+    private Paciente paciente(Long id, String nombre, String apPaterno, String apMaterno, String dpi, boolean activo) {
+        Paciente p = new Paciente();
+        p.setIdPaciente(id);
+        p.setNombre(nombre);
+        p.setApellidoPaterno(apPaterno);
+        p.setApellidoMaterno(apMaterno);
+        p.setDpiPaciente(dpi);
+        p.setTelefono("55550000");
+        p.setCorreoElectronico("x@correo.com");
+        p.setDireccion("Zona 1");
+        p.setActivo(activo);
+        return p;
+    }
+
+    private static final String BUSQUEDA =
+            "findByNombreContainingIgnoreCaseOrApellidoPaternoContainingIgnoreCaseOrApellidoMaternoContainingIgnoreCaseOrDpiPacienteContainingIgnoreCase";
+
+    @Test
+    void buscarResumen_devuelveSoloActivos_ordenadosPorNombre_conElDtoMinimo() {
+        when(repository.findByNombreContainingIgnoreCaseOrApellidoPaternoContainingIgnoreCaseOrApellidoMaternoContainingIgnoreCaseOrDpiPacienteContainingIgnoreCase(
+                "an", "an", "an", "an")).thenReturn(List.of(
+                paciente(2L, "Ana", "Zelaya", null, "222", true),
+                paciente(3L, "Juan", "Inactivo", "Perez", "333", false),
+                paciente(1L, "Andrea", "Lopez", "Garcia", "111", true)));
+
+        List<PacienteResumenDTO> r = service.buscarResumen("  an ");
+
+        assertThat(r).extracting(PacienteResumenDTO::idPaciente).containsExactly(2L, 1L);
+        assertThat(r.get(1).nombreCompleto()).isEqualTo("Andrea Lopez Garcia");
+        assertThat(r.get(0).nombreCompleto()).isEqualTo("Ana Zelaya");
+        assertThat(r.get(1).dpiPaciente()).isEqualTo("111");
+        // el DTO solo tiene estos campos: ni teléfono, ni correo, ni dirección
+        assertThat(PacienteResumenDTO.class.getRecordComponents())
+                .extracting(c -> c.getName())
+                .containsExactly("idPaciente", "nombreCompleto", "dpiPaciente", "activo");
+    }
+
+    @Test
+    void buscarResumen_conQVaciaNulaOMenosDeDosCaracteres_devuelveListaVacia_sinConsultar() {
+        assertThat(service.buscarResumen(null)).isEmpty();
+        assertThat(service.buscarResumen("")).isEmpty();
+        assertThat(service.buscarResumen("  a ")).isEmpty();
+
+        org.mockito.Mockito.verifyNoInteractions(repository);
+    }
+
+    @Test
+    void buscarResumen_limitaA20Resultados() {
+        List<Paciente> muchos = java.util.stream.IntStream.rangeClosed(1, 30)
+                .mapToObj(i -> paciente((long) i, "Maria" + String.format("%02d", i), "X", null, "d" + i, true))
+                .toList();
+        when(repository.findByNombreContainingIgnoreCaseOrApellidoPaternoContainingIgnoreCaseOrApellidoMaternoContainingIgnoreCaseOrDpiPacienteContainingIgnoreCase(
+                "ma", "ma", "ma", "ma")).thenReturn(muchos);
+
+        assertThat(service.buscarResumen("ma")).hasSize(20);
+    }
+
+    @Test
+    void resumen_devuelveElPacienteActivoOInactivo_y404SiNoExiste() {
+        when(repository.findById(1L)).thenReturn(Optional.of(paciente(1L, "Ana", "Lopez", "Garcia", "111", false)));
+        when(repository.findById(99L)).thenReturn(Optional.empty());
+
+        PacienteResumenDTO r = service.resumen(1L);
+
+        assertThat(r.nombreCompleto()).isEqualTo("Ana Lopez Garcia");
+        assertThat(r.activo()).isFalse();
+        assertThrows(RecursoNoEncontradoException.class, () -> service.resumen(99L));
     }
 }

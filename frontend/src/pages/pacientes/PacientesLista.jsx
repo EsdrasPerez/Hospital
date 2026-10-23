@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { desactivarPaciente, listarPacientes } from '../../api/pacientes.js'
 import { useAuth } from '../../auth/useAuth.js'
+import { BadgeActivo } from '../../components/Badge.jsx'
 import ConfirmDialog from '../../components/ConfirmDialog.jsx'
 import EmptyState from '../../components/EmptyState.jsx'
 import ErrorAlert from '../../components/ErrorAlert.jsx'
@@ -94,7 +95,7 @@ export default function PacientesLista() {
       render: (p) => (
         <Link
           to={`/pacientes/${p.idPaciente}`}
-          className={`font-medium hover:underline ${p.activo === false ? 'text-slate-500' : 'text-teal-800'}`}
+          className={`font-weight-bold${p.activo === false ? ' text-muted' : ''}`}
         >
           {nombreCompleto(p)}
         </Link>
@@ -113,13 +114,7 @@ export default function PacientesLista() {
       clave: 'activo',
       titulo: 'Estado',
       render: (p) => (
-        <span
-          className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-            p.activo === false ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-800'
-          }`}
-        >
-          {p.activo === false ? 'Inactivo' : 'Activo'}
-        </span>
+        <BadgeActivo activo={p.activo} />
       ),
     },
     {
@@ -129,12 +124,12 @@ export default function PacientesLista() {
       render: (p) => {
         const activo = p.activo !== false
         return (
-          <div className="flex justify-end gap-3 text-sm font-medium">
-            <Link to={`/pacientes/${p.idPaciente}`} className="text-teal-800 hover:underline">
+          <div className="tabla-acciones d-flex justify-content-end">
+            <Link to={`/pacientes/${p.idPaciente}`}>
               Ver
             </Link>
             {activo && puedeEditar && (
-              <Link to={`/pacientes/${p.idPaciente}/editar`} className="text-teal-800 hover:underline">
+              <Link to={`/pacientes/${p.idPaciente}/editar`}>
                 Editar
               </Link>
             )}
@@ -145,7 +140,7 @@ export default function PacientesLista() {
                   setErrorDesactivar('')
                   setADesactivar(p)
                 }}
-                className="text-red-600 hover:underline"
+                className="btn btn-link text-danger p-0"
               >
                 Desactivar
               </button>
@@ -159,16 +154,16 @@ export default function PacientesLista() {
   const visibles = pacientes.slice((pagina - 1) * TAMANO_PAGINA, pagina * TAMANO_PAGINA)
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <div className="card card-body d-flex flex-column flex-md-row align-items-md-center justify-content-md-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Pacientes</h1>
-          <p className="text-sm text-slate-500">Búsqueda por nombre, apellidos o DPI.</p>
+          <h1 className="h3 mb-0">Pacientes</h1>
+          <p className="text-muted mb-0">Búsqueda por nombre, apellidos o DPI.</p>
         </div>
         {puedeCrear && (
           <Link
             to="/pacientes/nuevo"
-            className="inline-flex items-center justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+            className="btn btn-primary btn-round"
           >
             Nuevo paciente
           </Link>
@@ -187,7 +182,7 @@ export default function PacientesLista() {
         onBuscar={setTexto}
         placeholderBusqueda="Buscar por nombre, apellidos o DPI"
         acciones={
-          <label className="flex items-center gap-2 text-sm text-slate-600">
+          <label className="d-flex align-items-center small mb-0">
             <input
               type="checkbox"
               checked={incluirInactivos}
@@ -195,7 +190,7 @@ export default function PacientesLista() {
                 setIncluirInactivos(e.target.checked)
                 setPagina(1)
               }}
-              className="h-4 w-4 rounded border-slate-300 text-teal-700"
+              className="mr-2"
             />
             Mostrar inactivos
           </label>

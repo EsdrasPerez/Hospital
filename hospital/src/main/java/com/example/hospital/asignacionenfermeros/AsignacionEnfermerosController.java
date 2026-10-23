@@ -1,6 +1,7 @@
 package com.example.hospital.asignacionenfermeros;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,7 +43,7 @@ public class AsignacionEnfermerosController {
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     @Operation(summary = "Asignar enfermero", description = "Asigna un enfermero a una hospitalización activa en una fecha y turno. No permite asignaciones duplicadas (mismo enfermero, hospitalización, fecha y turno).\n\nRoles permitidos: ADMIN.")
-    public ResponseEntity<AsignacionEnfermerosDTO> save(@RequestBody AsignacionEnfermerosDTO dto) {
+    public ResponseEntity<AsignacionEnfermerosDTO> save(@Valid @RequestBody AsignacionEnfermerosDTO dto) {
         AsignacionEnfermerosDTO creado = asignacionEnfermerosService.crear(dto);
         return new ResponseEntity<>(creado, HttpStatus.CREATED);
     }
@@ -52,7 +53,7 @@ public class AsignacionEnfermerosController {
     @Operation(summary = "Actualizar asignación", description = "Modifica el enfermero, la fecha o el turno de una asignación existente.\n\nRoles permitidos: ADMIN.")
     public ResponseEntity<AsignacionEnfermerosDTO> update(
             @PathVariable Long id,
-            @RequestBody AsignacionEnfermerosDTO dto) {
+            @Valid @RequestBody AsignacionEnfermerosDTO dto) {
         AsignacionEnfermerosDTO actualizado = asignacionEnfermerosService.actualizar(dto, id);
         return ResponseEntity.ok(actualizado);
     }
@@ -72,8 +73,10 @@ public class AsignacionEnfermerosController {
     }
 
     @GetMapping("/hospitalizacion/{idHospitalizacion}")
-    @Operation(summary = "Enfermeros de una hospitalización", description = "**Nuevo.** Devuelve los enfermeros asignados a una hospitalización (quién atiende al paciente en cada turno). Responde 404 si la hospitalización no existe.\n\nAcceso: cualquier usuario autenticado.")
-    public List<AsignacionEnfermerosDTO> findByHospitalizacion(@PathVariable Long idHospitalizacion) {
-        return asignacionEnfermerosService.findByHospitalizacion(idHospitalizacion);
+    @Operation(summary = "Enfermeros de una hospitalización", description = "**Nuevo.** Devuelve los enfermeros asignados a una hospitalización (quién atiende al paciente en cada turno). Responde 404 si la hospitalización no existe.\n\nAcceso: cualquier usuario autenticado.\n\nParámetro opcional `soloActivas` (por defecto `false`, igual que en los demás módulos): con `true` omite las asignaciones quitadas (borrado lógico).")
+    public List<AsignacionEnfermerosDTO> findByHospitalizacion(
+            @PathVariable Long idHospitalizacion,
+            @RequestParam(required = false, defaultValue = "false") boolean soloActivas) {
+        return asignacionEnfermerosService.findByHospitalizacion(idHospitalizacion, soloActivas);
     }
 }

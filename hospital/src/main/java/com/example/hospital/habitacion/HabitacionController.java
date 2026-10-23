@@ -1,6 +1,7 @@
 package com.example.hospital.habitacion;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,17 +30,14 @@ public class HabitacionController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO', 'ENFERMERO', 'RECEPCIONISTA')")
-    @Operation(summary = "Listar habitaciones", description = "Devuelve las habitaciones. Filtros opcionales:\n- `soloDisponibles=true`: solo habitaciones en estado Disponible\n- `soloActivas=true`: solo habitaciones activas\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA.")
+    @Operation(summary = "Listar habitaciones", description = "Devuelve las habitaciones. Todos los filtros son opcionales y se aplican juntos:\n- `piso`\n- `idTipoHabitacion`\n- `idEstadoHabitacion`\n- `soloActivas=true`: solo habitaciones activas\n- `soloDisponibles=true`: solo habitaciones activas en estado Disponible\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA.")
     public List<HabitacionDTO> findAll(
             @RequestParam(required = false, defaultValue = "false") boolean soloActivas,
-            @RequestParam(required = false, defaultValue = "false") boolean soloDisponibles) {
-        if (soloDisponibles) {
-            return habitacionService.findDisponibles();
-        }
-        if (soloActivas) {
-            return habitacionService.findActivas();
-        }
-        return habitacionService.findAll();
+            @RequestParam(required = false, defaultValue = "false") boolean soloDisponibles,
+            @RequestParam(required = false) Integer piso,
+            @RequestParam(required = false) Long idTipoHabitacion,
+            @RequestParam(required = false) Long idEstadoHabitacion) {
+        return habitacionService.buscar(piso, idTipoHabitacion, idEstadoHabitacion, soloActivas, soloDisponibles);
     }
 
     @GetMapping("/{id}")
@@ -59,7 +57,7 @@ public class HabitacionController {
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     @Operation(summary = "Registrar habitación", description = "Crea una nueva habitación. El número debe ser único.\n\nRoles permitidos: ADMIN.")
-    public ResponseEntity<HabitacionDTO> save(@RequestBody HabitacionDTO dto) {
+    public ResponseEntity<HabitacionDTO> save(@Valid @RequestBody HabitacionDTO dto) {
         HabitacionDTO creada = habitacionService.crear(dto);
         return new ResponseEntity<>(creada, HttpStatus.CREATED);
     }
@@ -69,14 +67,14 @@ public class HabitacionController {
     @Operation(summary = "Actualizar habitación", description = "Modifica los datos de una habitación.\n\nRoles permitidos: ADMIN.")
     public ResponseEntity<HabitacionDTO> update(
             @PathVariable Long id,
-            @RequestBody HabitacionDTO dto) {
+            @Valid @RequestBody HabitacionDTO dto) {
         HabitacionDTO actualizada = habitacionService.actualizar(dto, id);
         return ResponseEntity.ok(actualizada);
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/estado/{nuevoEstadoId}")
-    @Operation(summary = "Cambiar estado de habitación", description = "Cambia el estado de la habitación (Disponible, Ocupada, Mantenimiento).\n\nRoles permitidos: ADMIN.")
+    @Operation(summary = "Cambiar estado de habitación", description = "Cambia el estado de la habitación (Disponible, Ocupada, Mantenimiento). Responde 422 si no es coherente con la ocupación real: no pasa a Disponible si está llena, no pasa a Ocupada si no tiene pacientes y no pasa a Mantenimiento si tiene pacientes hospitalizados. La misma regla se aplica en PUT cuando cambia el estado.\n\nRoles permitidos: ADMIN.")
     public ResponseEntity<HabitacionDTO> cambiarEstado(
             @PathVariable Long id,
             @PathVariable Long nuevoEstadoId) {

@@ -1,14 +1,10 @@
 export default function EmptyState({ titulo = 'Sin resultados', descripcion, accion }) {
   return (
-    <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
-      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-        <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-        </svg>
-      </div>
-      <h3 className="text-base font-semibold text-slate-700">{titulo}</h3>
-      {descripcion && <p className="mt-1 max-w-sm text-sm text-slate-500">{descripcion}</p>}
-      {accion && <div className="mt-4">{accion}</div>}
+    <div className="text-center py-5 px-3">
+      <i className="now-ui-icons files_box text-muted" style={{ fontSize: '2.2rem' }} aria-hidden="true" />
+      <h5 className="mt-2 mb-1">{titulo}</h5>
+      {descripcion && <p className="text-muted mb-0">{descripcion}</p>}
+      {accion && <div className="mt-3">{accion}</div>}
     </div>
   )
 }

@@ -22,6 +22,7 @@ const SOLO_ADMIN = [ADMIN]
 export const MODULOS = [
   {
     clave: 'pacientes',
+    icono: 'users_single-02',
     titulo: 'Pacientes',
     ruta: '/pacientes',
     grupo: 'Atención',
@@ -35,10 +36,11 @@ export const MODULOS = [
   },
   {
     clave: 'citas',
+    icono: 'ui-1_calendar-60',
     titulo: 'Citas',
     ruta: '/citas',
     grupo: 'Atención',
-    implementado: false,
+    implementado: true,
     permisos: {
       ver: TODOS,
       crear: [ADMIN, RECEPCIONISTA],
@@ -49,34 +51,45 @@ export const MODULOS = [
   },
   {
     clave: 'consultas',
+    icono: 'files_paper',
     titulo: 'Consultas',
     ruta: '/consultas',
     grupo: 'Atención',
-    implementado: false,
-    permisos: { ver: TODOS, crear: [ADMIN, MEDICO], editar: [ADMIN, MEDICO], desactivar: SOLO_ADMIN },
+    implementado: true,
+    permisos: {
+      ver: TODOS,
+      crear: [ADMIN, MEDICO],
+      editar: [ADMIN, MEDICO],
+      desactivar: SOLO_ADMIN,
+      // /api/diagnostico-consulta: asociar y quitar diagnósticos de una consulta
+      asociarDiagnostico: [ADMIN, MEDICO],
+    },
   },
   {
     clave: 'diagnosticos',
+    icono: 'education_glasses',
     titulo: 'Diagnósticos',
     ruta: '/diagnosticos',
     grupo: 'Atención',
-    implementado: false,
+    implementado: true,
     permisos: { ver: TODOS, crear: [ADMIN, MEDICO], editar: [ADMIN, MEDICO], desactivar: SOLO_ADMIN },
   },
   {
     clave: 'tratamientos',
+    icono: 'objects_support-17',
     titulo: 'Tratamientos',
     ruta: '/tratamientos',
     grupo: 'Atención',
-    implementado: false,
+    implementado: true,
     permisos: { ver: TODOS, crear: [ADMIN, MEDICO], editar: [ADMIN, MEDICO], desactivar: SOLO_ADMIN },
   },
   {
     clave: 'emergencia',
+    icono: 'health_ambulance',
     titulo: 'Emergencia',
     ruta: '/emergencia',
     grupo: 'Atención',
-    implementado: false,
+    implementado: true,
     permisos: {
       ver: TODOS,
       crear: [ADMIN, MEDICO, ENFERMERO],
@@ -86,10 +99,11 @@ export const MODULOS = [
   },
   {
     clave: 'triaje',
-    titulo: 'Triaje',
+    icono: 'ui-1_bell-53',
+    titulo: 'Niveles de triaje',
     ruta: '/triaje',
     grupo: 'Atención',
-    implementado: false,
+    implementado: true,
     permisos: {
       ver: CLINICOS,
       crear: [ADMIN, MEDICO, ENFERMERO],
@@ -98,70 +112,130 @@ export const MODULOS = [
     },
   },
   {
-    clave: 'hospitalizaciones',
-    titulo: 'Hospitalizaciones',
-    ruta: '/hospitalizaciones',
+    clave: 'procedimientos',
+    icono: 'design_scissors',
+    titulo: 'Procedimientos de emergencia',
+    ruta: '/procedimientos',
     grupo: 'Atención',
-    implementado: false,
+    implementado: true,
+    // /api/procedimientos-emergencia: lectura ADMIN/MEDICO/ENFERMERO; escritura ADMIN/MEDICO; desactivar ADMIN
     permisos: {
-      ver: CLINICOS,
-      crear: [ADMIN, MEDICO, RECEPCIONISTA],
+      ver: [ADMIN, MEDICO, ENFERMERO],
+      crear: [ADMIN, MEDICO],
       editar: [ADMIN, MEDICO],
       desactivar: SOLO_ADMIN,
     },
   },
   {
+    clave: 'hospitalizaciones',
+    icono: 'business_bank',
+    titulo: 'Hospitalizaciones',
+    ruta: '/hospitalizaciones',
+    grupo: 'Atención',
+    implementado: true,
+    permisos: {
+      ver: CLINICOS,
+      crear: [ADMIN, MEDICO, RECEPCIONISTA],
+      editar: [ADMIN, MEDICO],
+      desactivar: SOLO_ADMIN,
+      // POST /api/hospitalizaciones/{id}/alta
+      darAlta: [ADMIN, MEDICO],
+      // /api/asignacion-enfermeros: lectura abierta, escritura solo ADMIN
+      asignarEnfermeros: SOLO_ADMIN,
+    },
+  },
+  {
     clave: 'habitaciones',
+    icono: 'shopping_shop',
     titulo: 'Habitaciones',
     ruta: '/habitaciones',
     grupo: 'Atención',
-    implementado: false,
-    permisos: { ver: CLINICOS, crear: SOLO_ADMIN, editar: SOLO_ADMIN, desactivar: SOLO_ADMIN },
+    implementado: true,
+    // PATCH /estado/{id} también es solo ADMIN
+    permisos: { ver: CLINICOS, crear: SOLO_ADMIN, editar: SOLO_ADMIN, desactivar: SOLO_ADMIN, cambiarEstado: SOLO_ADMIN },
   },
   {
     clave: 'medicamentos',
+    icono: 'shopping_box',
     titulo: 'Medicamentos',
     ruta: '/medicamentos',
     grupo: 'Farmacia',
-    implementado: false,
+    implementado: true,
     permisos: {
       ver: TODOS,
       crear: [ADMIN, FARMACEUTICO, MEDICO],
       editar: [ADMIN, FARMACEUTICO],
       desactivar: SOLO_ADMIN,
+      // PATCH /api/medicamentos/{id}/stock
+      ajustarStock: [ADMIN, FARMACEUTICO],
+    },
+  },
+  {
+    clave: 'recetas',
+    icono: 'files_single-copy-04',
+    titulo: 'Medicamentos recetados',
+    ruta: '/recetas',
+    grupo: 'Farmacia',
+    implementado: true,
+    // /api/tratamiento-medicamento: lectura ADMIN/MEDICO/FARMACEUTICO; asignar (crear) y quitar solo ADMIN/MEDICO.
+    permisos: {
+      ver: [ADMIN, MEDICO, FARMACEUTICO],
+      crear: [ADMIN, MEDICO],
+      editar: [],
+      desactivar: [ADMIN, MEDICO],
     },
   },
   {
     clave: 'facturas',
+    icono: 'files_single-copy-04',
     titulo: 'Facturas',
     ruta: '/facturas',
     grupo: 'Facturación',
-    implementado: false,
+    implementado: true,
+    // /api/facturas: GET abierto a cualquier usuario autenticado, pero el saldo (GET /{id}/saldo) y los pagos solo los leen
+    // ADMIN/CAJERO(/RECEPCIONISTA); por eso la pantalla se limita a los roles de caja y recepción.
+    // POST: ADMIN/CAJERO/RECEPCIONISTA; PUT y PATCH estado: ADMIN/CAJERO; DELETE: ADMIN.
+    // /api/detalle-factura: POST ADMIN/CAJERO/RECEPCIONISTA; PUT ADMIN/CAJERO; DELETE ADMIN.
     permisos: {
-      ver: TODOS,
+      ver: [ADMIN, CAJERO, RECEPCIONISTA],
       crear: [ADMIN, CAJERO, RECEPCIONISTA],
       editar: [ADMIN, CAJERO],
       desactivar: SOLO_ADMIN,
+      cambiarEstado: [ADMIN, CAJERO],
+      agregarLinea: [ADMIN, CAJERO, RECEPCIONISTA],
+      editarLinea: [ADMIN, CAJERO],
+      quitarLinea: SOLO_ADMIN,
     },
   },
   {
     clave: 'cuentas',
+    icono: 'business_money-coins',
     titulo: 'Cuentas',
     ruta: '/cuentas',
     grupo: 'Facturación',
-    implementado: false,
-    permisos: { ver: TODOS, crear: [ADMIN, CAJERO], editar: [ADMIN, CAJERO], desactivar: SOLO_ADMIN },
+    implementado: true,
+    // /api/cuentas: GET abierto; POST, PUT y PATCH ajustar-saldo: ADMIN/CAJERO; DELETE: ADMIN
+    permisos: {
+      ver: [ADMIN, CAJERO, RECEPCIONISTA],
+      crear: [ADMIN, CAJERO],
+      editar: [ADMIN, CAJERO],
+      desactivar: SOLO_ADMIN,
+      ajustarSaldo: [ADMIN, CAJERO],
+    },
   },
   {
     clave: 'pagos',
+    icono: 'shopping_credit-card',
     titulo: 'Pagos',
     ruta: '/pagos',
     grupo: 'Facturación',
-    implementado: false,
+    implementado: true,
+    // /api/pagos: GET y POST ADMIN/CAJERO; PUT (corregir) y DELETE (anular) solo ADMIN
     permisos: { ver: [ADMIN, CAJERO], crear: [ADMIN, CAJERO], editar: SOLO_ADMIN, desactivar: SOLO_ADMIN },
   },
   {
     clave: 'personal',
+    icono: 'users_circle-08',
     titulo: 'Personal médico',
     ruta: '/personal',
     grupo: 'Administración',
@@ -171,6 +245,7 @@ export const MODULOS = [
   },
   {
     clave: 'catalogos',
+    icono: 'design_bullet-list-67',
     titulo: 'Catálogos',
     ruta: '/catalogos',
     grupo: 'Administración',
@@ -181,6 +256,7 @@ export const MODULOS = [
   },
   {
     clave: 'usuarios',
+    icono: 'objects_key-25',
     titulo: 'Usuarios y roles',
     ruta: '/usuarios',
     grupo: 'Administración',

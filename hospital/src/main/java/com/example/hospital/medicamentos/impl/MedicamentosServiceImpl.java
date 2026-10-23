@@ -5,11 +5,12 @@ import com.example.hospital.medicamentos.MedicamentosRepository;
 import com.example.hospital.medicamentos.MedicamentosService;
 import com.example.hospital.medicamentos.dto.MedicamentosDTO;
 import com.example.hospital.tratamientomedicamento.TratamientoMedicamentoRepository;
+import com.example.hospital.shared.exception.DuplicadoException;
+import com.example.hospital.shared.exception.RecursoNoEncontradoException;
 import com.example.hospital.shared.exception.ReglaNegocioException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -62,7 +63,7 @@ public class MedicamentosServiceImpl implements MedicamentosService {
     @Transactional(readOnly = true)
     public MedicamentosDTO findById(Long id) {
         Medicamentos entity = medicamentosRepository.findById(id)
-                .orElseThrow(() -> new ReglaNegocioException("No existe el medicamento con ID: " + id));
+                .orElseThrow(() -> new RecursoNoEncontradoException("No existe el medicamento con ID: " + id));
         return mapToDTO(entity);
     }
 
@@ -76,6 +77,22 @@ public class MedicamentosServiceImpl implements MedicamentosService {
         return medicamentosRepository.findByNombreComercialContainingIgnoreCaseOrNombreGenericoContainingIgnoreCase(query, query)
                 .stream()
                 .filter(m -> Boolean.TRUE.equals(m.getActivo()))
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MedicamentosDTO> buscar(String criterio, boolean bajoStock, boolean soloActivos) {
+        String q = criterio == null ? "" : criterio.trim().toLowerCase();
+        return medicamentosRepository.findAll().stream()
+                .filter(m -> !soloActivos || Boolean.TRUE.equals(m.getActivo()))
+                .filter(m -> !bajoStock || (m.getStock() != null && m.getStockMinimo() != null
+                        && m.getStock() <= m.getStockMinimo()))
+                .filter(m -> q.isEmpty()
+                        || (m.getNombreComercial() != null && m.getNombreComercial().toLowerCase().contains(q))
+                        || (m.getNombreGenerico() != null && m.getNombreGenerico().toLowerCase().contains(q))
+                        || (m.getLaboratorio() != null && m.getLaboratorio().toLowerCase().contains(q)))
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
@@ -118,7 +135,7 @@ public class MedicamentosServiceImpl implements MedicamentosService {
         }
 
         Medicamentos existente = medicamentosRepository.findById(id)
-                .orElseThrow(() -> new ReglaNegocioException("No se encontró el medicamento con ID: " + id));
+                .orElseThrow(() -> new RecursoNoEncontradoException("No se encontró el medicamento con ID: " + id));
 
         validarDatosMedicamento(dto, id);
 
@@ -126,7 +143,7 @@ public class MedicamentosServiceImpl implements MedicamentosService {
         existente.setNombreGenerico(dto.nombreGenerico() != null ? dto.nombreGenerico().trim() : null);
         existente.setPresentacion(dto.presentacion() != null ? dto.presentacion().trim() : null);
         existente.setLaboratorio(dto.laboratorio() != null ? dto.laboratorio().trim() : null);
-        existente.setStock(dto.stock() != null ? dto.stock() : 0);
+        // El stock NO se modifica aqui: solo cambia con PATCH /{id}/stock.
         existente.setStockMinimo(dto.stockMinimo() != null ? dto.stockMinimo() : 0);
         existente.setPrecio(dto.precio());
         if (dto.requiereReceta() != null) {
@@ -151,7 +168,7 @@ public class MedicamentosServiceImpl implements MedicamentosService {
         }
 
         Medicamentos existente = medicamentosRepository.findById(id)
-                .orElseThrow(() -> new ReglaNegocioException("No existe el medicamento con ID: " + id));
+                .orElseThrow(() -> new RecursoNoEncontradoException("No existe el medicamento con ID: " + id));
 
         if (!Boolean.TRUE.equals(existente.getActivo())) {
             throw new ReglaNegocioException("No se puede ajustar el stock de un medicamento inactivo.");
@@ -180,7 +197,7 @@ public class MedicamentosServiceImpl implements MedicamentosService {
         }
 
         Medicamentos existente = medicamentosRepository.findById(id)
-                .orElseThrow(() -> new ReglaNegocioException("No se encontró el medicamento con ID: " + id));
+                .orElseThrow(() -> new RecursoNoEncontradoException("No se encontró el medicamento con ID: " + id));
 
         if (!Boolean.TRUE.equals(existente.getActivo())) {
             throw new ReglaNegocioException("El medicamento ya se encuentra inactivo.");
@@ -188,7 +205,7 @@ public class MedicamentosServiceImpl implements MedicamentosService {
 
         // RN-MED-05: Integridad referencial con tratamientos
         if (tratamientoMedicamentoRepository.existsByIdMedicamento(id)) {
-            throw new ReglaNegocioException("No se puede eliminar el medicamento porque está asociado a uno o más tratamientos médicos.");
+            throw new DuplicadoException("No se puede desactivar el medicamento porque está asociado a uno o más tratamientos médicos.");
         }
 
         // RN-MED-06: Borrado lógico sistemático
@@ -201,33 +218,17 @@ public class MedicamentosServiceImpl implements MedicamentosService {
             throw new ReglaNegocioException("Los datos del medicamento son obligatorios.");
         }
 
-        // RN-MED-01: Nombre comercial obligatorio y único
-        if (dto.nombreComercial() == null || dto.nombreComercial().trim().isEmpty()) {
-            throw new ReglaNegocioException("El nombre comercial del medicamento es obligatorio.");
-        }
+        // RN-MED-01: nombre comercial unico (obligatoriedad, tamanos, precio y stock se validan en el DTO)
         String nombreComercial = dto.nombreComercial().trim();
 
         if (idActual == null) {
             if (medicamentosRepository.existsByNombreComercialIgnoreCase(nombreComercial)) {
-                throw new ReglaNegocioException("Ya existe un medicamento registrado con el nombre comercial: " + nombreComercial);
+                throw new DuplicadoException("Ya existe un medicamento registrado con el nombre comercial: " + nombreComercial);
             }
         } else {
             if (medicamentosRepository.existsByNombreComercialIgnoreCaseAndIdMedicamentoNot(nombreComercial, idActual)) {
-                throw new ReglaNegocioException("Ya existe otro medicamento registrado con el nombre comercial: " + nombreComercial);
+                throw new DuplicadoException("Ya existe otro medicamento registrado con el nombre comercial: " + nombreComercial);
             }
-        }
-
-        // RN-MED-02: Stock y Stock Mínimo no pueden ser negativos
-        if (dto.stock() != null && dto.stock() < 0) {
-            throw new ReglaNegocioException("El stock no puede ser un número negativo.");
-        }
-        if (dto.stockMinimo() != null && dto.stockMinimo() < 0) {
-            throw new ReglaNegocioException("El stock mínimo no puede ser un número negativo.");
-        }
-
-        // RN-MED-03: Precio obligatorio y mayor a cero
-        if (dto.precio() == null || dto.precio().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new ReglaNegocioException("El precio del medicamento es obligatorio y debe ser mayor a cero.");
         }
     }
 }

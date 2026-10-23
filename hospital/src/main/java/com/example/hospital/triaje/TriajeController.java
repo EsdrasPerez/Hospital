@@ -1,6 +1,7 @@
 package com.example.hospital.triaje;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -44,20 +45,20 @@ public class TriajeController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO', 'ENFERMERO')")
     @PostMapping
     @Operation(summary = "Registrar nivel de triaje", description = "Agrega un nivel de triaje. El nombre del nivel debe ser único.\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO.")
-    public ResponseEntity<TriajeDTO> crear(@RequestBody TriajeDTO dto) {
+    public ResponseEntity<TriajeDTO> crear(@Valid @RequestBody TriajeDTO dto) {
         return new ResponseEntity<>(triajeService.crear(dto), HttpStatus.CREATED);
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO', 'ENFERMERO')")
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar nivel de triaje", description = "Modifica un nivel de triaje.\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO.")
-    public ResponseEntity<TriajeDTO> actualizar(@PathVariable Long id, @RequestBody TriajeDTO dto) {
+    public ResponseEntity<TriajeDTO> actualizar(@PathVariable Long id, @Valid @RequestBody TriajeDTO dto) {
         return ResponseEntity.ok(triajeService.actualizar(dto, id));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
-    @Operation(summary = "Eliminar nivel de triaje", description = "Desactiva un nivel de triaje. No se permite si hay ingresos a emergencia que lo usan.\n\nRoles permitidos: ADMIN.")
+    @Operation(summary = "Eliminar nivel de triaje", description = "Desactiva un nivel de triaje. Responde 409 si hay ingresos a emergencia activos que lo usan.\n\nRoles permitidos: ADMIN.")
     public ResponseEntity<Void> eliminar(@PathVariable Long id) {
         triajeService.eliminar(id);
         return ResponseEntity.noContent().build();

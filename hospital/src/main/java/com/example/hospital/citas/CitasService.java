@@ -11,6 +11,9 @@ public interface CitasService {
 
     List<CitasDTO> findActivas();
 
+    /** Filtros opcionales y combinables (todos se aplican a la vez). */
+    List<CitasDTO> buscar(Long idPaciente, Long idMedico, LocalDate fecha, boolean soloActivas);
+
     List<CitasDTO> findByPaciente(Long idPaciente);
 
     List<CitasDTO> findByMedico(Long idMedico);

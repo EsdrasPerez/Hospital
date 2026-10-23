@@ -11,6 +11,9 @@ public interface EmergenciaService {
 
     List<EmergenciaDTO> findActivas();
 
+    /** Filtros opcionales y combinables: idPaciente y soloActivas. */
+    List<EmergenciaDTO> buscar(Long idPaciente, boolean soloActivas);
+
     EmergenciaDTO findById(Long id);
 
     List<EmergenciaDTO> findByPaciente(Long idPaciente);

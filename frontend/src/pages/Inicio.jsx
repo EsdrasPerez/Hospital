@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Card, CardBody, Col, Row } from 'reactstrap'
 import { useAuth } from '../auth/useAuth.js'
 import { menuParaRol } from '../config/menu.js'
 import { ETIQUETAS_ROL } from '../utils/formato.js'
@@ -8,30 +9,40 @@ export default function Inicio() {
   const modulos = menuParaRol(rol).flatMap((g) => g.items)
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Bienvenido, {usuario?.username}</h1>
-        <p className="text-sm text-slate-500">Perfil: {ETIQUETAS_ROL[rol] ?? rol}</p>
-      </div>
+    <div>
+      <Card>
+        <CardBody>
+          <h3 className="mb-1">Bienvenido, {usuario?.username}</h3>
+          <p className="text-muted mb-0">Perfil: {ETIQUETAS_ROL[rol] ?? rol}</p>
+        </CardBody>
+      </Card>
 
       {modulos.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Row>
           {modulos.map((m) => (
-            <Link
-              key={m.clave}
-              to={m.ruta}
-              className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-teal-600 hover:shadow"
-            >
-              <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">{m.grupo}</p>
-              <p className="mt-1 text-lg font-semibold text-slate-900">{m.titulo}</p>
-              <p className="mt-1 text-sm text-slate-500">Abrir módulo</p>
-            </Link>
+            <Col key={m.clave} xs="12" sm="6" xl="4">
+              <Link to={m.ruta} className="tarjeta-modulo">
+                <Card>
+                  <CardBody>
+                    <div className="d-flex align-items-center">
+                      <div className="mr-3 text-primary" style={{ fontSize: '2rem', lineHeight: 1 }}>
+                        <i className={`now-ui-icons ${m.icono ?? 'design_app'}`} />
+                      </div>
+                      <div className="tarjeta-modulo-texto">
+                        <h5 className="mb-0">{m.titulo}</h5>
+                        <small className="text-muted">Abrir módulo</small>
+                      </div>
+                    </div>
+                  </CardBody>
+                </Card>
+              </Link>
+            </Col>
           ))}
-        </div>
+        </Row>
       ) : (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
-          Aún no hay módulos disponibles para su perfil en esta versión. Se habilitarán en próximas fases.
-        </div>
+        <Card>
+          <CardBody className="text-muted">Aún no hay módulos disponibles para su perfil en esta versión. Se habilitarán en próximas fases.</CardBody>
+        </Card>
       )}
     </div>
   )

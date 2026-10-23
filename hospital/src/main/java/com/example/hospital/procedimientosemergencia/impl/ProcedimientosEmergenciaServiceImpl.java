@@ -9,6 +9,7 @@ import com.example.hospital.shared.exception.RecursoNoEncontradoException;
 import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.emergencia.Emergencia;
 import com.example.hospital.emergencia.EmergenciaRepository;
+import com.example.hospital.medico.Medico;
 import com.example.hospital.medico.MedicoRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,19 +48,17 @@ public class ProcedimientosEmergenciaServiceImpl implements ProcedimientosEmerge
         if (dto == null) {
             throw new ReglaNegocioException("Los datos de el procedimiento son requeridos");
         }
-        if (dto.idEmergencia() == null) {
-            throw new ReglaNegocioException("La emergencia es obligatoria");
-        }
+        // Campos obligatorios y tamaños: Bean Validation en ProcedimientosEmergenciaDTO (400 con detalles).
+        // Referencias inexistentes o inactivas en el cuerpo: 422.
         Emergencia emergencia = emergenciaRepository.findById(dto.idEmergencia())
-                .orElseThrow(() -> new RecursoNoEncontradoException("No existe la emergencia con ID: " + dto.idEmergencia()));
+                .orElseThrow(() -> new ReglaNegocioException("No existe la emergencia con ID: " + dto.idEmergencia()));
         if (emergencia.getFechaHoraAlta() != null && idActual == null) {
             throw new ReglaNegocioException("No se pueden registrar procedimientos en una emergencia cerrada");
         }
-        if (dto.descripcion() == null || dto.descripcion().isBlank()) {
-            throw new ReglaNegocioException("La descripción del procedimiento es obligatoria");
-        }
-        if (dto.idMedico() == null || !medicoRepository.existsById(dto.idMedico())) {
-            throw new RecursoNoEncontradoException("El médico indicado no existe");
+        Medico medico = medicoRepository.findById(dto.idMedico())
+                .orElseThrow(() -> new ReglaNegocioException("El médico con ID " + dto.idMedico() + " no existe"));
+        if (!Boolean.TRUE.equals(medico.getEstado())) {
+            throw new ReglaNegocioException("El médico con ID " + dto.idMedico() + " se encuentra inactivo");
         }
         if (dto.fechaHora() != null) {
             if (dto.fechaHora().isAfter(java.time.LocalDateTime.now())) {

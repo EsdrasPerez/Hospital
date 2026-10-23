@@ -14,6 +14,9 @@ public interface ConsultasService {
 
     ConsultasDTO findByCita(Long idCita);
 
+    /** Consulta de la cita como lista: vacía si la cita todavía no tiene consulta. */
+    List<ConsultasDTO> listarPorCita(Long idCita);
+
     ConsultasDTO crear(ConsultasDTO dto);
 
     ConsultasDTO actualizar(ConsultasDTO dto, Long id);

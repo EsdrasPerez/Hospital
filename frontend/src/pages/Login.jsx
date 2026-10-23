@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Button } from 'reactstrap'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth.js'
 import ErrorAlert from '../components/ErrorAlert.jsx'
@@ -41,10 +42,10 @@ export default function Login() {
   }
 
   return (
-    <form onSubmit={enviar} noValidate className="space-y-4">
-      <div>
-        <h1 className="text-lg font-semibold text-slate-900">Iniciar sesión</h1>
-        <p className="text-sm text-slate-500">Ingrese sus credenciales para continuar.</p>
+    <form onSubmit={enviar} noValidate>
+      <div className="mb-3 text-center">
+        <h4 className="mb-1">Iniciar sesión</h4>
+        <p className="text-muted mb-0">Ingrese sus credenciales para continuar.</p>
       </div>
 
       {sesionExpirada && !errorGeneral && (
@@ -53,6 +54,7 @@ export default function Login() {
       <ErrorAlert mensaje={errorGeneral} />
 
       <FormField
+        className="col-12"
         nombre="username"
         etiqueta="Usuario"
         valor={username}
@@ -63,6 +65,7 @@ export default function Login() {
         requerido
       />
       <FormField
+        className="col-12"
         nombre="password"
         etiqueta="Contraseña"
         tipo="password"
@@ -73,13 +76,9 @@ export default function Login() {
         requerido
       />
 
-      <button
-        type="submit"
-        disabled={enviando}
-        className="w-full rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60"
-      >
+      <Button type="submit" color="primary" className="btn-round" block disabled={enviando}>
         {enviando ? 'Ingresando...' : 'Ingresar'}
-      </button>
+      </Button>
     </form>
   )
 }

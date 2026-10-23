@@ -1,7 +1,9 @@
 package com.example.hospital.citas.impl;
 
 import com.example.hospital.citas.Citas;
+import com.example.hospital.shared.exception.DuplicadoException;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.citas.CitasRepository;
 import com.example.hospital.citas.CitasService;
 import com.example.hospital.citas.dto.CitasDTO;
@@ -19,10 +21,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class CitasServiceImpl implements CitasService {
+
+    // RN-06: una cita solo puede nacer en uno de estos estados
+    private static final Set<String> ESTADOS_INICIALES = Set.of("Programada", "Confirmada");
 
     private final CitasRepository citasRepository;
     private final PacienteRepository pacienteRepository;
@@ -73,61 +79,60 @@ public class CitasServiceImpl implements CitasService {
     }
 
     /**
-     * Valida las reglas de negocio para la gestión de citas:
+     * Valida las reglas de negocio para la gestión de citas (los campos obligatorios los valida
+     * Bean Validation en CitasDTO, que responde 400 con detalles por campo):
      * 1. Paciente debe existir y estar activo.
      * 2. Médico debe existir y estar activo.
      * 3. Estado de cita debe existir y estar activo.
-     * 4. La fecha de la cita no puede ser anterior al día actual.
+     * 4. La fecha de la cita no puede ser anterior al día actual. En una actualización solo se
+     *    exige si cambian la fecha o la hora (así se pueden corregir citas ya pasadas).
      * 5. No crear/actualizar una cita si el médico ya tiene otra cita activa en la misma fecha y hora.
+     * 6. Al crear, el estado inicial solo puede ser Programada o Confirmada.
+     *
+     * @param existente cita actual (null al crear)
      */
-    private void validarReglasDeNegocio(CitasDTO dto, Long idCitaActual) {
+    private void validarReglasDeNegocio(CitasDTO dto, Citas existente) {
         if (dto == null) {
-            throw new IllegalArgumentException("Los datos de la cita médica no pueden ser nulos");
+            throw new ReglaNegocioException("Los datos de la cita médica no pueden ser nulos");
         }
+        Long idCitaActual = existente != null ? existente.getIdCita() : null;
 
-        if (dto.idPaciente() == null) {
-            throw new IllegalArgumentException("El ID del paciente es obligatorio");
-        }
-        if (dto.idMedico() == null) {
-            throw new IllegalArgumentException("El ID del médico es obligatorio");
-        }
-        if (dto.idEstado() == null) {
-            throw new IllegalArgumentException("El ID del estado de la cita es obligatorio");
-        }
-        if (dto.fecha() == null) {
-            throw new IllegalArgumentException("La fecha de la cita médica es obligatoria");
-        }
-        if (dto.hora() == null) {
-            throw new IllegalArgumentException("La hora de la cita médica es obligatoria");
-        }
-
-        // RN-01: La fecha de la cita no puede ser en el pasado
-        if (dto.fecha().isBefore(LocalDate.now())) {
-            throw new IllegalArgumentException("La fecha de la cita no puede ser anterior a la fecha actual (" + LocalDate.now() + ")");
+        // RN-01: La fecha de la cita no puede ser en el pasado (si es nueva o si se reprograma)
+        boolean reprogramada = existente == null
+                || !dto.fecha().equals(existente.getFecha())
+                || !dto.hora().equals(existente.getHora());
+        if (reprogramada && dto.fecha().isBefore(LocalDate.now())) {
+            throw new ReglaNegocioException("La fecha de la cita no puede ser anterior a la fecha actual (" + LocalDate.now() + ")");
         }
 
         // RN-02: El paciente debe existir y estar activo
         Paciente paciente = pacienteRepository.findById(dto.idPaciente())
-                .orElseThrow(() -> new IllegalArgumentException("El paciente con ID " + dto.idPaciente() + " no existe"));
+                .orElseThrow(() -> new ReglaNegocioException("El paciente con ID " + dto.idPaciente() + " no existe"));
 
         if (paciente.getActivo() != null && !paciente.getActivo()) {
-            throw new IllegalArgumentException("El paciente seleccionado se encuentra inactivo");
+            throw new ReglaNegocioException("El paciente seleccionado se encuentra inactivo");
         }
 
         // RN-03: El médico debe existir y estar activo
         Medico medico = medicoRepository.findById(dto.idMedico())
-                .orElseThrow(() -> new IllegalArgumentException("El médico con ID " + dto.idMedico() + " no existe"));
+                .orElseThrow(() -> new ReglaNegocioException("El médico con ID " + dto.idMedico() + " no existe"));
 
         if (medico.getEstado() != null && !medico.getEstado()) {
-            throw new IllegalArgumentException("El médico seleccionado se encuentra inactivo");
+            throw new ReglaNegocioException("El médico seleccionado se encuentra inactivo");
         }
 
         // RN-04: El estado de la cita debe existir y estar activo
         EstadoCita estado = estadoCitaRepository.findById(dto.idEstado())
-                .orElseThrow(() -> new IllegalArgumentException("El estado de cita con ID " + dto.idEstado() + " no existe"));
+                .orElseThrow(() -> new ReglaNegocioException("El estado de cita con ID " + dto.idEstado() + " no existe"));
 
         if (estado.getActivo() != null && !estado.getActivo()) {
-            throw new IllegalArgumentException("El estado de cita '" + estado.getDescripcion() + "' no se encuentra activo");
+            throw new ReglaNegocioException("El estado de cita '" + estado.getDescripcion() + "' no se encuentra activo");
+        }
+
+        // RN-06: Estado inicial solo Programada o Confirmada
+        if (existente == null && ESTADOS_INICIALES.stream().noneMatch(e -> e.equalsIgnoreCase(estado.getDescripcion()))) {
+            throw new ReglaNegocioException("Una cita nueva solo puede crearse en estado Programada o Confirmada (se indicó '"
+                    + estado.getDescripcion() + "')");
         }
 
         // RN-05: El médico no puede tener otra cita activa en la misma fecha y hora
@@ -143,7 +148,7 @@ public class CitasServiceImpl implements CitasService {
         }
 
         if (medicoOcupado) {
-            throw new IllegalArgumentException("El médico ya tiene asignada una cita activa en la fecha " +
+            throw new DuplicadoException("El médico ya tiene asignada una cita activa en la fecha " +
                     dto.fecha() + " a las " + dto.hora());
         }
     }
@@ -165,9 +170,21 @@ public class CitasServiceImpl implements CitasService {
     }
 
     @Override
+    public List<CitasDTO> buscar(Long idPaciente, Long idMedico, LocalDate fecha, boolean soloActivas) {
+        return citasRepository.findAll()
+                .stream()
+                .filter(c -> idPaciente == null || idPaciente.equals(c.getIdPaciente()))
+                .filter(c -> idMedico == null || idMedico.equals(c.getIdMedico()))
+                .filter(c -> fecha == null || fecha.equals(c.getFecha()))
+                .filter(c -> !soloActivas || Boolean.TRUE.equals(c.getActivo()))
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public List<CitasDTO> findByPaciente(Long idPaciente) {
         if (idPaciente == null) {
-            throw new IllegalArgumentException("El ID del paciente es obligatorio");
+            throw new ReglaNegocioException("El ID del paciente es obligatorio");
         }
         return citasRepository.findByIdPaciente(idPaciente)
                 .stream()
@@ -178,7 +195,7 @@ public class CitasServiceImpl implements CitasService {
     @Override
     public List<CitasDTO> findByMedico(Long idMedico) {
         if (idMedico == null) {
-            throw new IllegalArgumentException("El ID del médico es obligatorio");
+            throw new ReglaNegocioException("El ID del médico es obligatorio");
         }
         return citasRepository.findByIdMedico(idMedico)
                 .stream()
@@ -189,7 +206,7 @@ public class CitasServiceImpl implements CitasService {
     @Override
     public List<CitasDTO> findByFecha(LocalDate fecha) {
         if (fecha == null) {
-            throw new IllegalArgumentException("La fecha de consulta es obligatoria");
+            throw new ReglaNegocioException("La fecha de consulta es obligatoria");
         }
         return citasRepository.findByFecha(fecha)
                 .stream()
@@ -224,13 +241,13 @@ public class CitasServiceImpl implements CitasService {
     @Transactional
     public CitasDTO actualizar(CitasDTO dto, Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID de la cita médica es obligatorio");
+            throw new ReglaNegocioException("El ID de la cita médica es obligatorio");
         }
 
         Citas existente = citasRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe la cita médica con ID: " + id));
 
-        validarReglasDeNegocio(dto, id);
+        validarReglasDeNegocio(dto, existente);
 
         // Si cambia el estado, validar la máquina de estados con EstadoCitaService
         if (!existente.getIdEstado().equals(dto.idEstado())) {
@@ -259,16 +276,16 @@ public class CitasServiceImpl implements CitasService {
     @Transactional
     public CitasDTO cambiarEstado(Long id, Long nuevoIdEstado) {
         if (id == null || nuevoIdEstado == null) {
-            throw new IllegalArgumentException("El ID de la cita y el nuevo ID de estado son obligatorios");
+            throw new ReglaNegocioException("El ID de la cita y el nuevo ID de estado son obligatorios");
         }
 
         Citas existente = citasRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe la cita médica con ID: " + id));
 
         EstadoCita estadoOrigen = estadoCitaRepository.findById(existente.getIdEstado())
-                .orElseThrow(() -> new RuntimeException("Estado actual de la cita no encontrado"));
+                .orElseThrow(() -> new RecursoNoEncontradoException("Estado actual de la cita no encontrado"));
         EstadoCita estadoDestino = estadoCitaRepository.findById(nuevoIdEstado)
-                .orElseThrow(() -> new IllegalArgumentException("El nuevo estado con ID " + nuevoIdEstado + " no existe"));
+                .orElseThrow(() -> new RecursoNoEncontradoException("El nuevo estado con ID " + nuevoIdEstado + " no existe"));
 
         // Validar flujo permitido de estados según RN-EC-02
         estadoCitaService.validarTransicion(estadoOrigen.getDescripcion(), estadoDestino.getDescripcion());
@@ -282,7 +299,7 @@ public class CitasServiceImpl implements CitasService {
     @Transactional
     public void eliminar(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID de la cita es obligatorio");
+            throw new ReglaNegocioException("El ID de la cita es obligatorio");
         }
 
         Citas existente = citasRepository.findById(id)
@@ -301,7 +318,7 @@ public class CitasServiceImpl implements CitasService {
     @Override
     public List<CitasDTO> agendaMedico(Long idMedico, LocalDate fecha) {
         if (idMedico == null) {
-            throw new IllegalArgumentException("El ID del médico es obligatorio");
+            throw new ReglaNegocioException("El ID del médico es obligatorio");
         }
         if (!medicoRepository.existsById(idMedico)) {
             throw new RecursoNoEncontradoException("No existe el médico con ID: " + idMedico);

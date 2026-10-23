@@ -1,6 +1,7 @@
 package com.example.hospital.consultas;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,7 +34,7 @@ public class ConsultasController {
             @RequestParam(required = false, defaultValue = "false") boolean soloActivas,
             @RequestParam(required = false) Long idCita) {
         if (idCita != null) {
-            return List.of(consultasService.findByCita(idCita));
+            return consultasService.listarPorCita(idCita);
         }
         if (soloActivas) {
             return consultasService.findActivas();
@@ -50,7 +51,7 @@ public class ConsultasController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO')")
     @PostMapping
     @Operation(summary = "Registrar consulta", description = "Registra la atención de una cita: síntomas y signos vitales. Una cita solo puede tener una consulta.\n\nRoles permitidos: ADMIN, MEDICO.")
-    public ResponseEntity<ConsultasDTO> save(@RequestBody ConsultasDTO dto) {
+    public ResponseEntity<ConsultasDTO> save(@Valid @RequestBody ConsultasDTO dto) {
         ConsultasDTO creada = consultasService.crear(dto);
         return new ResponseEntity<>(creada, HttpStatus.CREATED);
     }
@@ -60,7 +61,7 @@ public class ConsultasController {
     @Operation(summary = "Actualizar consulta", description = "Corrige los datos registrados en una consulta.\n\nRoles permitidos: ADMIN, MEDICO.")
     public ResponseEntity<ConsultasDTO> update(
             @PathVariable Long id,
-            @RequestBody ConsultasDTO dto) {
+            @Valid @RequestBody ConsultasDTO dto) {
         ConsultasDTO actualizada = consultasService.actualizar(dto, id);
         return ResponseEntity.ok(actualizada);
     }

@@ -1,14 +1,12 @@
 import { useId } from 'react'
-
-const base =
-  'block w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 ' +
-  'focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/30 disabled:bg-slate-100 disabled:text-slate-500'
+import { FormFeedback, FormGroup, Input, Label } from 'reactstrap'
 
 /**
- * Campo de formulario con etiqueta y error debajo.
+ * Campo de formulario con etiqueta y error debajo (FormGroup / Input / FormFeedback de reactstrap).
  * - tipo: 'text' | 'email' | 'date' | 'password' | 'select' | 'textarea' ...
  * - Para 'select' pasar `opciones: [{ valor, etiqueta }]` y `placeholder` (opción vacía).
  * - `error` es el mensaje del campo (cliente o `detalles` del backend).
+ * - Dentro de un <Row>, ocupa media fila; con `className="col-12"` ocupa la fila completa.
  */
 export default function FormField({
   nombre,
@@ -25,22 +23,22 @@ export default function FormField({
   ...resto
 }) {
   const id = useId()
-  const errorId = `${id}-error`
   const comunes = {
     id,
     name: nombre,
     value: valor ?? '',
     onChange,
     'aria-invalid': error ? true : undefined,
-    'aria-describedby': error ? errorId : undefined,
-    className: `${base} ${error ? 'border-red-400' : 'border-slate-300'}`,
+    'aria-describedby': error ? `${id}-error` : undefined,
     ...resto,
   }
+  const claseColumna = /(^|\s)col-/.test(className) ? '' : 'col-md-6'
 
   let control
   if (tipo === 'select') {
+    // Se usa <select> nativo con form-control (Bootstrap 4); reactstrap 9 emitiría clases de Bootstrap 5.
     control = (
-      <select {...comunes}>
+      <select {...comunes} className={`form-control${error ? ' is-invalid' : ''}`}>
         <option value="">{placeholder ?? 'Seleccione...'}</option>
         {opciones.map((o) => (
           <option key={o.valor} value={o.valor}>
@@ -50,28 +48,28 @@ export default function FormField({
       </select>
     )
   } else if (tipo === 'textarea') {
-    control = <textarea rows={3} placeholder={placeholder} {...comunes} />
+    control = <Input type="textarea" rows={3} placeholder={placeholder} invalid={Boolean(error)} {...comunes} />
   } else {
-    control = <input type={tipo} placeholder={placeholder} {...comunes} />
+    control = <Input type={tipo} placeholder={placeholder} invalid={Boolean(error)} {...comunes} />
   }
 
   return (
-    <div className={className}>
-      <label htmlFor={id} className="mb-1 block text-sm font-medium text-slate-700">
+    <FormGroup className={`${claseColumna} ${className}`.trim()}>
+      <Label for={id} className="font-weight-bold small mb-1">
         {etiqueta}
         {requerido && (
-          <span className="ml-0.5 text-red-600" aria-hidden="true">
+          <span className="text-danger ml-1" aria-hidden="true">
             *
           </span>
         )}
-      </label>
+      </Label>
       {control}
-      {ayuda && !error && <p className="mt-1 text-xs text-slate-500">{ayuda}</p>}
+      {ayuda && !error && <small className="form-text text-muted">{ayuda}</small>}
       {error && (
-        <p id={errorId} className="mt-1 text-xs font-medium text-red-600">
+        <FormFeedback id={`${id}-error`} className="d-block">
           {error}
-        </p>
+        </FormFeedback>
       )}
-    </div>
+    </FormGroup>
   )
 }

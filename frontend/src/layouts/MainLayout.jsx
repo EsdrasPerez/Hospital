@@ -1,99 +1,114 @@
-import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Button, Container, Navbar } from 'reactstrap'
 import { useAuth } from '../auth/useAuth.js'
-import { menuParaRol } from '../config/menu.js'
+import { MODULOS, menuParaRol } from '../config/menu.js'
 import { ETIQUETAS_ROL } from '../utils/formato.js'
 
-const claseEnlace = ({ isActive }) =>
-  `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-    isActive ? 'bg-teal-700 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-  }`
+// Color del degradado de la barra lateral de Now UI (blue | green | orange | red | yellow).
+// "blue" combina con la banda azul oscuro del panel y transmite calma/confianza (adecuado para un hospital).
+const COLOR_SIDEBAR = 'blue'
+
+const IconoLogo = () => (
+  <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true">
+    <path d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z" />
+  </svg>
+)
+
+/** Nombre del módulo según la ruta actual (se muestra en la barra superior). */
+function tituloDeRuta(pathname) {
+  if (pathname === '/') return 'Inicio'
+  const modulo = MODULOS.find((m) => pathname === m.ruta || pathname.startsWith(`${m.ruta}/`))
+  return modulo ? modulo.titulo : 'Hospital'
+}
 
 export default function MainLayout() {
   const { usuario, rol, logout } = useAuth()
-  const [menuAbierto, setMenuAbierto] = useState(false)
+  const location = useLocation()
   const grupos = menuParaRol(rol)
+  // La plantilla marca la opción activa con la clase `active` en el <li>
+  const esActivo = (ruta) => (ruta === '/' ? location.pathname === '/' : location.pathname === ruta || location.pathname.startsWith(`${ruta}/`))
 
-  const sidebar = (
-    <nav
-      className="flex h-full flex-col bg-slate-900 text-slate-200"
-      aria-label="Menú principal"
-      onClick={() => setMenuAbierto(false)} // cierra el sidebar (tablet) al elegir una opción
-    >
-      <div className="flex h-16 shrink-0 items-center gap-3 px-5">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-700 text-white">
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
-            <path d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z" />
-          </svg>
-        </span>
-        <span className="text-lg font-semibold text-white">Hospital</span>
-      </div>
-      <div className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
-        <NavLink to="/" end className={claseEnlace}>
-          Inicio
-        </NavLink>
-        {grupos.map((grupo) => (
-          <div key={grupo.titulo}>
-            <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">{grupo.titulo}</p>
-            <div className="space-y-1">
-              {grupo.items.map((m) => (
-                <NavLink key={m.clave} to={m.ruta} className={claseEnlace}>
-                  {m.titulo}
-                </NavLink>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </nav>
-  )
+  // En tablet/móvil la barra lateral es un panel que se abre con el botón (clase nav-open de la plantilla).
+  useEffect(() => {
+    document.documentElement.classList.remove('nav-open')
+    document.getElementById('toggle-sidebar')?.classList.remove('toggled')
+    window.scrollTo(0, 0)
+  }, [location.pathname])
+
+  const alternarSidebar = () => {
+    document.documentElement.classList.toggle('nav-open')
+    document.getElementById('toggle-sidebar')?.classList.toggle('toggled')
+  }
 
   return (
-    <div className="min-h-screen lg:flex">
-      {/* Sidebar fijo en pantallas grandes */}
-      <aside className="hidden w-64 shrink-0 lg:block">
-        <div className="fixed inset-y-0 w-64">{sidebar}</div>
-      </aside>
-
-      {/* Sidebar colapsable (tablet / móvil) */}
-      {menuAbierto && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-slate-900/50" onClick={() => setMenuAbierto(false)} />
-          <aside className="relative h-full w-64 shadow-xl">{sidebar}</aside>
-        </div>
-      )}
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6">
-          <button
-            type="button"
-            onClick={() => setMenuAbierto(true)}
-            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
-            aria-label="Abrir menú"
-          >
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <div className="ml-auto flex items-center gap-4">
-            <div className="text-right leading-tight">
-              <p className="text-sm font-semibold text-slate-800">{usuario?.username}</p>
-              <p className="text-xs text-slate-500">{ETIQUETAS_ROL[rol] ?? rol}</p>
+    <div className="wrapper">
+      <div className="sidebar" data-color={COLOR_SIDEBAR}>
+        <div className="logo">
+          <Link to="/" className="simple-text logo-mini">
+            <div className="logo-img text-white d-flex align-items-center justify-content-center">
+              <IconoLogo />
             </div>
-            <button
-              type="button"
-              onClick={logout}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Cerrar sesión
-            </button>
-          </div>
-        </header>
-        <main className="flex-1 p-4 sm:p-6">
-          <div className="mx-auto max-w-6xl">
-            <Outlet />
-          </div>
-        </main>
+          </Link>
+          <Link to="/" className="simple-text logo-normal">
+            Hospital
+          </Link>
+        </div>
+        <div className="sidebar-wrapper" style={{ overflowY: 'auto' }}>
+          <ul className="nav" aria-label="Menú principal">
+            <li className={esActivo('/') ? 'active' : ''}>
+              <Link to="/" className="nav-link">
+                <i className="now-ui-icons design_app" />
+                <p>Inicio</p>
+              </Link>
+            </li>
+            {grupos.map((grupo) => [
+              <li key={`t-${grupo.titulo}`} className="sidebar-modulos-titulo">
+                {grupo.titulo}
+              </li>,
+              ...grupo.items.map((m) => (
+                <li key={m.clave} className={esActivo(m.ruta) ? 'active' : ''}>
+                  <Link to={m.ruta} className="nav-link">
+                    <i className={`now-ui-icons ${m.icono ?? 'design_bullet-list-67'}`} />
+                    <p>{m.titulo}</p>
+                  </Link>
+                </li>
+              )),
+            ])}
+          </ul>
+        </div>
+      </div>
+
+      <div className="main-panel">
+        <Navbar expand="lg" className="navbar-absolute fixed-top navbar-transparent">
+          <Container fluid>
+            <div className="navbar-wrapper">
+              <div className="navbar-toggle">
+                <button type="button" id="toggle-sidebar" className="navbar-toggler" onClick={alternarSidebar} aria-label="Abrir o cerrar el menú">
+                  <span className="navbar-toggler-bar bar1" />
+                  <span className="navbar-toggler-bar bar2" />
+                  <span className="navbar-toggler-bar bar3" />
+                </button>
+              </div>
+              <span className="navbar-brand">{tituloDeRuta(location.pathname)}</span>
+            </div>
+            <div className="ml-auto d-flex align-items-center text-white">
+              <div className="text-right mr-3 d-none d-sm-block" style={{ lineHeight: 1.2 }}>
+                <div className="font-weight-bold">{usuario?.username}</div>
+                <small>{ETIQUETAS_ROL[rol] ?? rol}</small>
+              </div>
+              <Button color="neutral" size="sm" className="btn-round" onClick={logout}>
+                <i className="now-ui-icons media-1_button-power mr-1" />
+                Cerrar sesión
+              </Button>
+            </div>
+          </Container>
+        </Navbar>
+
+        <div className="panel-header panel-header-sm" />
+        <div className="content">
+          <Outlet />
+        </div>
       </div>
     </div>
   )

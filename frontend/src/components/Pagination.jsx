@@ -1,3 +1,5 @@
+import { Button } from 'reactstrap'
+
 /**
  * Paginación en el cliente (el backend actual devuelve listas completas, sin paginar).
  * pagina es base 1.
@@ -8,32 +10,22 @@ export default function Pagination({ pagina, totalElementos, tamano, onCambiarPa
 
   const desde = (pagina - 1) * tamano + 1
   const hasta = Math.min(pagina * tamano, totalElementos)
-  const boton =
-    'rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40'
 
   return (
-    <nav
-      className="flex flex-col items-center justify-between gap-2 border-t border-slate-200 px-4 py-3 sm:flex-row"
-      aria-label="Paginación"
-    >
-      <p className="text-sm text-slate-600">
+    <nav className="d-flex flex-column flex-sm-row align-items-center justify-content-between border-top pt-3 mt-2" aria-label="Paginación">
+      <p className="small text-muted mb-2 mb-sm-0">
         Mostrando {desde}–{hasta} de {totalElementos}
       </p>
-      <div className="flex items-center gap-2">
-        <button type="button" className={boton} disabled={pagina <= 1} onClick={() => onCambiarPagina(pagina - 1)}>
+      <div className="d-flex align-items-center acciones-grupo">
+        <Button color="primary" outline size="sm" className="btn-round" disabled={pagina <= 1} onClick={() => onCambiarPagina(pagina - 1)}>
           Anterior
-        </button>
-        <span className="text-sm text-slate-600">
+        </Button>
+        <span className="small text-muted">
           Página {pagina} de {totalPaginas}
         </span>
-        <button
-          type="button"
-          className={boton}
-          disabled={pagina >= totalPaginas}
-          onClick={() => onCambiarPagina(pagina + 1)}
-        >
+        <Button color="primary" outline size="sm" className="btn-round" disabled={pagina >= totalPaginas} onClick={() => onCambiarPagina(pagina + 1)}>
           Siguiente
-        </button>
+        </Button>
       </div>
     </nav>
   )

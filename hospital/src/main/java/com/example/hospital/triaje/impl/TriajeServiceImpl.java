@@ -1,5 +1,6 @@
 package com.example.hospital.triaje.impl;
 
+import com.example.hospital.emergencia.EmergenciaRepository;
 import com.example.hospital.triaje.Triaje;
 import com.example.hospital.triaje.TriajeRepository;
 import com.example.hospital.triaje.TriajeService;
@@ -17,9 +18,11 @@ import java.util.stream.Collectors;
 public class TriajeServiceImpl implements TriajeService {
 
     private final TriajeRepository triajeRepository;
+    private final EmergenciaRepository emergenciaRepository;
 
-    public TriajeServiceImpl(TriajeRepository triajeRepository) {
+    public TriajeServiceImpl(TriajeRepository triajeRepository, EmergenciaRepository emergenciaRepository) {
         this.triajeRepository = triajeRepository;
+        this.emergenciaRepository = emergenciaRepository;
     }
 
     private TriajeDTO mapToDTO(Triaje e) {
@@ -35,9 +38,7 @@ public class TriajeServiceImpl implements TriajeService {
         if (dto == null) {
             throw new ReglaNegocioException("Los datos de el triaje son requeridos");
         }
-        if (dto.nivelDeEmergencia() == null || dto.nivelDeEmergencia().isBlank()) {
-            throw new ReglaNegocioException("El nivel de emergencia es obligatorio");
-        }
+        // El nivel obligatorio y los tamaños los valida Bean Validation en TriajeDTO (400 con detalles)
         String nivel = dto.nivelDeEmergencia().trim();
         boolean duplicado = idActual == null
                 ? triajeRepository.existsByNivelDeEmergenciaIgnoreCase(nivel)
@@ -68,7 +69,7 @@ public class TriajeServiceImpl implements TriajeService {
         validar(dto, null);
         Triaje entity = new Triaje();
         entity.setNivelDeEmergencia(dto.nivelDeEmergencia().trim());
-        entity.setDescripcion(dto.descripcion());
+        entity.setDescripcion(dto.descripcion() != null ? dto.descripcion().trim() : null);
         entity.setActivo(dto.activo() != null ? dto.activo() : true);
         return mapToDTO(triajeRepository.save(entity));
     }
@@ -91,6 +92,10 @@ public class TriajeServiceImpl implements TriajeService {
     @Transactional
     public void eliminar(Long id) {
         Triaje existente = buscar(id);
+        // Conflicto con dependientes: no se desactiva un nivel que usan emergencias activas (409)
+        if (emergenciaRepository.existsByIdTriajeAndActivoTrue(id)) {
+            throw new IllegalStateException("No se puede desactivar el nivel de triaje porque hay ingresos a emergencia activos que lo usan.");
+        }
         // Eliminación lógica para conservar el historial
         existente.setActivo(false);
         triajeRepository.save(existente);

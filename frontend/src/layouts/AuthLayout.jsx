@@ -1,21 +1,26 @@
 import { Outlet } from 'react-router-dom'
+import { Card, CardBody, Col, Row } from 'reactstrap'
 
 export default function AuthLayout() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-slate-100 px-4 py-10">
-      <div className="mb-6 flex items-center gap-3">
-        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-700 text-white">
-          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor" aria-hidden="true">
+    <div className="login-fondo">
+      <div className="login-contenido">
+        <div className="text-center text-white mb-4">
+          <svg viewBox="0 0 24 24" width="44" height="44" fill="currentColor" aria-hidden="true">
             <path d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z" />
           </svg>
-        </span>
-        <div>
-          <p className="text-xl font-semibold leading-tight text-slate-900">Hospital</p>
-          <p className="text-xs text-slate-500">Sistema de gestión hospitalaria</p>
+          <h2 className="mb-0 mt-2">Hospital</h2>
+          <p className="mb-0">Sistema de gestión hospitalaria</p>
         </div>
-      </div>
-      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <Outlet />
+        <Row className="w-100 justify-content-center">
+          <Col xs="12" sm="9" md="6" lg="4">
+            <Card className="card-login mb-0">
+              <CardBody>
+                <Outlet />
+              </CardBody>
+            </Card>
+          </Col>
+        </Row>
       </div>
     </div>
   )

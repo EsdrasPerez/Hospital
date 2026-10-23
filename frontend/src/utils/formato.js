@@ -38,3 +38,42 @@ export const ETIQUETAS_ROL = {
   FARMACEUTICO: 'Farmacéutico',
   CAJERO: 'Cajero',
 }
+
+const pad2 = (n) => String(n).padStart(2, '0')
+
+/** Fecha de hoy (hora local) en formato YYYY-MM-DD. */
+export function hoyISO() {
+  const d = new Date()
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
+/** 'HH:mm:ss' -> 'HH:mm' (valor para <input type="time"> y visualización). */
+export function formatearHora(valor) {
+  return valor ? String(valor).slice(0, 5) : '—'
+}
+
+/**
+ * LocalDateTime del backend ('YYYY-MM-DDTHH:mm:ss[.SSS]', sin zona) -> valor de
+ * <input type="datetime-local"> ('YYYY-MM-DDTHH:mm'). Se corta el texto: no se usa Date
+ * para evitar desfases de zona horaria.
+ */
+export function aInputFechaHora(valor) {
+  return valor ? String(valor).slice(0, 16) : ''
+}
+
+/** Valor de <input type="datetime-local"> -> LocalDateTime del backend. */
+export function deInputFechaHora(valor) {
+  return valor ? `${valor}:00` : null
+}
+
+/** Texto acortado con puntos suspensivos. */
+export function acortar(texto, max = 60) {
+  if (!texto) return '—'
+  return texto.length > max ? `${texto.slice(0, max - 1)}…` : texto
+}
+
+/** Quetzales con separador de miles y 2 decimales (el backend guarda DECIMAL(10,2)). */
+export function formatearMoneda(valor) {
+  if (valor === null || valor === undefined || valor === '') return '—'
+  return `Q ${Number(valor).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
