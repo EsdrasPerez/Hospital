@@ -7,6 +7,7 @@ export const RUTAS = {
   auth: {
     login: `${PREFIJO}/auth/login`,
     me: `${PREFIJO}/auth/me`,
+    register: `${PREFIJO}/auth/register`,
   },
   pacientes: `${PREFIJO_PACIENTES}/paciente`,
   alergias: `${PREFIJO}/alergias`,
@@ -40,4 +41,10 @@ export const RUTAS = {
   cuentas: `${PREFIJO}/cuentas`,
   metodosPago: `${PREFIJO}/metodos-pago`,
   estadosFactura: `${PREFIJO}/estados-factura`,
+  departamentos: `${PREFIJO}/departamentos`,
+  especialidadesMedicas: `${PREFIJO}/especialidad-medico`,
+  especialidadesClinica: `${PREFIJO}/especialidad-clinica`,
+  medicoEspecialidades: `${PREFIJO}/medico-especialidades`,
+  usuarios: `${PREFIJO}/usuarios`,
+  roles: `${PREFIJO}/rol`,
 }

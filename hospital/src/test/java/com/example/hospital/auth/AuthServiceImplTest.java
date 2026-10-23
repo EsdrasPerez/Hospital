@@ -58,6 +58,36 @@ class AuthServiceImplTest {
     }
 
     @Test
+    void login_actualizaElUltimoAcceso() {
+        UserDetails user = User.withUsername("admin").password("hash").roles("ADMIN").build();
+        when(authenticationManager.authenticate(any(Authentication.class)))
+                .thenReturn(new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities()));
+        when(jwtService.generar(user)).thenReturn("t");
+        Usuarios u = new Usuarios();
+        u.setNombreUsuario("admin");
+        when(usuariosRepository.findByNombreUsuario("admin")).thenReturn(Optional.of(u));
+
+        service.login(new LoginRequest("admin", "secreta"));
+
+        assertThat(u.getUltimoAcceso()).isNotNull();
+        verify(usuariosRepository).save(u);
+    }
+
+    @Test
+    void register_devuelveElIdDelUsuarioCreado() {
+        when(usuariosRepository.findByNombreUsuario("nuevo")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("Clave1234")).thenReturn("h");
+        when(rolRepository.findByNombre("CAJERO")).thenReturn(Optional.of(rol(6L, "CAJERO")));
+        when(usuariosRepository.save(any(Usuarios.class))).thenAnswer(inv -> {
+            Usuarios g = inv.getArgument(0);
+            g.setIdUsuario(77L);
+            return g;
+        });
+
+        assertThat(service.register(new RegisterRequest("nuevo", "Clave1234", "cajero"))).isEqualTo(77L);
+    }
+
+    @Test
     void login_propagaBadCredentials_yNoGeneraToken_siLasCredencialesSonInvalidas() {
         when(authenticationManager.authenticate(any(Authentication.class)))
                 .thenThrow(new BadCredentialsException("Credenciales invalidas"));

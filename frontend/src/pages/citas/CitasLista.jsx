@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { listarCitas } from '../../api/citas.js'
 import { useAuth } from '../../auth/useAuth.js'
 import { BadgeActivo } from '../../components/Badge.jsx'
@@ -26,7 +26,9 @@ export default function CitasLista() {
 
   const [idPaciente, setIdPaciente] = useState('')
   const [idMedico, setIdMedico] = useState('')
-  const [fecha, setFecha] = useState('')
+  const [params] = useSearchParams()
+  // ?fecha=YYYY-MM-DD (enlace de "Citas del día" en Inicio)
+  const [fecha, setFecha] = useState(/^\d{4}-\d{2}-\d{2}$/.test(params.get('fecha') ?? '') ? params.get('fecha') : '')
   const [idEstado, setIdEstado] = useState('')
   const [texto, setTexto] = useState('')
   const [incluirInactivas, setIncluirInactivas] = useState(false)

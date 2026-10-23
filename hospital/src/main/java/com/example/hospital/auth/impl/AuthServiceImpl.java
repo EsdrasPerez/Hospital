@@ -1,5 +1,6 @@
 package com.example.hospital.auth.impl;
 
+import org.springframework.transaction.annotation.Transactional;
 import com.example.hospital.auth.AuthService;
 import com.example.hospital.auth.dto.LoginRequest;
 import com.example.hospital.auth.dto.LoginResponse;
@@ -42,18 +43,25 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional
     public LoginResponse login(LoginRequest request) {
         Authentication auth = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.username(), request.password())
         );
 
         UserDetails user = (UserDetails) auth.getPrincipal();
+        // Registra el último acceso del usuario
+        usuariosRepository.findByNombreUsuario(user.getUsername()).ifPresent(u -> {
+            u.setUltimoAcceso(LocalDateTime.now());
+            usuariosRepository.save(u);
+        });
         String token = jwtService.generar(user);
         return new LoginResponse(token, "Bearer");
     }
 
     @Override
-    public void register(RegisterRequest request) {
+    @Transactional
+    public Long register(RegisterRequest request) {
         if (usuariosRepository.findByNombreUsuario(request.username()).isPresent()) {
             throw new DuplicadoException("El usuario ya existe");
         }
@@ -70,6 +78,7 @@ public class AuthServiceImpl implements AuthService {
         nuevoUsuario.setUltimoAcceso(LocalDateTime.now());
         nuevoUsuario.setIdRol(rol.getIdRol());
 
-        usuariosRepository.save(nuevoUsuario);
+        Usuarios guardado = usuariosRepository.save(nuevoUsuario);
+        return guardado != null ? guardado.getIdUsuario() : null;
     }
 }

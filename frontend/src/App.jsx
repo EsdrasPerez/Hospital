@@ -1,52 +1,59 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './auth/ProtectedRoute.jsx'
 import RoleRoute from './auth/RoleRoute.jsx'
 import { obtenerModulo } from './config/menu.js'
 import AuthLayout from './layouts/AuthLayout.jsx'
 import MainLayout from './layouts/MainLayout.jsx'
-import Inicio from './pages/Inicio.jsx'
-import Login from './pages/Login.jsx'
-import NoAutorizado from './pages/NoAutorizado.jsx'
-import NoEncontrado from './pages/NoEncontrado.jsx'
-import CitaDetalle from './pages/citas/CitaDetalle.jsx'
-import CitaForm from './pages/citas/CitaForm.jsx'
-import CitasLista from './pages/citas/CitasLista.jsx'
-import ConsultaDetalle from './pages/consultas/ConsultaDetalle.jsx'
-import ConsultaForm from './pages/consultas/ConsultaForm.jsx'
-import ConsultasLista from './pages/consultas/ConsultasLista.jsx'
-import DiagnosticoDetalle from './pages/diagnosticos/DiagnosticoDetalle.jsx'
-import DiagnosticoForm from './pages/diagnosticos/DiagnosticoForm.jsx'
-import DiagnosticosLista from './pages/diagnosticos/DiagnosticosLista.jsx'
-import TratamientoDetalle from './pages/tratamientos/TratamientoDetalle.jsx'
-import TratamientoForm from './pages/tratamientos/TratamientoForm.jsx'
-import TratamientosLista from './pages/tratamientos/TratamientosLista.jsx'
-import HabitacionDetalle from './pages/habitaciones/HabitacionDetalle.jsx'
-import HabitacionForm from './pages/habitaciones/HabitacionForm.jsx'
-import HabitacionesLista from './pages/habitaciones/HabitacionesLista.jsx'
-import HospitalizacionDetalle from './pages/hospitalizaciones/HospitalizacionDetalle.jsx'
-import HospitalizacionForm from './pages/hospitalizaciones/HospitalizacionForm.jsx'
-import HospitalizacionesLista from './pages/hospitalizaciones/HospitalizacionesLista.jsx'
-import MedicamentoDetalle from './pages/medicamentos/MedicamentoDetalle.jsx'
-import MedicamentoForm from './pages/medicamentos/MedicamentoForm.jsx'
-import MedicamentosLista from './pages/medicamentos/MedicamentosLista.jsx'
-import RecetasLista from './pages/recetas/RecetasLista.jsx'
-import CuentaDetalle from './pages/cuentas/CuentaDetalle.jsx'
-import CuentaForm from './pages/cuentas/CuentaForm.jsx'
-import CuentasLista from './pages/cuentas/CuentasLista.jsx'
-import FacturaDetalle from './pages/facturas/FacturaDetalle.jsx'
-import FacturaForm from './pages/facturas/FacturaForm.jsx'
-import FacturasLista from './pages/facturas/FacturasLista.jsx'
-import PagosLista from './pages/pagos/PagosLista.jsx'
-import EmergenciaDetalle from './pages/emergencias/EmergenciaDetalle.jsx'
-import EmergenciaForm from './pages/emergencias/EmergenciaForm.jsx'
-import EmergenciasLista from './pages/emergencias/EmergenciasLista.jsx'
-import ProcedimientoForm from './pages/procedimientos/ProcedimientoForm.jsx'
-import ProcedimientosLista from './pages/procedimientos/ProcedimientosLista.jsx'
-import TriajeForm from './pages/triaje/TriajeForm.jsx'
-import TriajeLista from './pages/triaje/TriajeLista.jsx'
-import PacienteDetalle from './pages/pacientes/PacienteDetalle.jsx'
-import PacienteForm from './pages/pacientes/PacienteForm.jsx'
-import PacientesLista from './pages/pacientes/PacientesLista.jsx'
+import Loading from './components/Loading.jsx'
+const Inicio = lazy(() => import('./pages/Inicio.jsx'))
+const Login = lazy(() => import('./pages/Login.jsx'))
+const NoAutorizado = lazy(() => import('./pages/NoAutorizado.jsx'))
+const NoEncontrado = lazy(() => import('./pages/NoEncontrado.jsx'))
+const CitaDetalle = lazy(() => import('./pages/citas/CitaDetalle.jsx'))
+const CitaForm = lazy(() => import('./pages/citas/CitaForm.jsx'))
+const CitasLista = lazy(() => import('./pages/citas/CitasLista.jsx'))
+const ConsultaDetalle = lazy(() => import('./pages/consultas/ConsultaDetalle.jsx'))
+const ConsultaForm = lazy(() => import('./pages/consultas/ConsultaForm.jsx'))
+const ConsultasLista = lazy(() => import('./pages/consultas/ConsultasLista.jsx'))
+const DiagnosticoDetalle = lazy(() => import('./pages/diagnosticos/DiagnosticoDetalle.jsx'))
+const DiagnosticoForm = lazy(() => import('./pages/diagnosticos/DiagnosticoForm.jsx'))
+const DiagnosticosLista = lazy(() => import('./pages/diagnosticos/DiagnosticosLista.jsx'))
+const TratamientoDetalle = lazy(() => import('./pages/tratamientos/TratamientoDetalle.jsx'))
+const TratamientoForm = lazy(() => import('./pages/tratamientos/TratamientoForm.jsx'))
+const TratamientosLista = lazy(() => import('./pages/tratamientos/TratamientosLista.jsx'))
+const HabitacionDetalle = lazy(() => import('./pages/habitaciones/HabitacionDetalle.jsx'))
+const HabitacionForm = lazy(() => import('./pages/habitaciones/HabitacionForm.jsx'))
+const HabitacionesLista = lazy(() => import('./pages/habitaciones/HabitacionesLista.jsx'))
+const HospitalizacionDetalle = lazy(() => import('./pages/hospitalizaciones/HospitalizacionDetalle.jsx'))
+const HospitalizacionForm = lazy(() => import('./pages/hospitalizaciones/HospitalizacionForm.jsx'))
+const HospitalizacionesLista = lazy(() => import('./pages/hospitalizaciones/HospitalizacionesLista.jsx'))
+const MedicamentoDetalle = lazy(() => import('./pages/medicamentos/MedicamentoDetalle.jsx'))
+const MedicamentoForm = lazy(() => import('./pages/medicamentos/MedicamentoForm.jsx'))
+const MedicamentosLista = lazy(() => import('./pages/medicamentos/MedicamentosLista.jsx'))
+const RecetasLista = lazy(() => import('./pages/recetas/RecetasLista.jsx'))
+const CuentaDetalle = lazy(() => import('./pages/cuentas/CuentaDetalle.jsx'))
+const CuentaForm = lazy(() => import('./pages/cuentas/CuentaForm.jsx'))
+const CuentasLista = lazy(() => import('./pages/cuentas/CuentasLista.jsx'))
+const FacturaDetalle = lazy(() => import('./pages/facturas/FacturaDetalle.jsx'))
+const FacturaForm = lazy(() => import('./pages/facturas/FacturaForm.jsx'))
+const FacturasLista = lazy(() => import('./pages/facturas/FacturasLista.jsx'))
+const PagosLista = lazy(() => import('./pages/pagos/PagosLista.jsx'))
+const CatalogosPagina = lazy(() => import('./pages/catalogos/CatalogosPagina.jsx'))
+const MedicoDetalle = lazy(() => import('./pages/personal/MedicoDetalle.jsx'))
+const MedicoForm = lazy(() => import('./pages/personal/MedicoForm.jsx'))
+const PersonalPagina = lazy(() => import('./pages/personal/PersonalPagina.jsx'))
+const UsuariosPagina = lazy(() => import('./pages/usuarios/UsuariosPagina.jsx'))
+const EmergenciaDetalle = lazy(() => import('./pages/emergencias/EmergenciaDetalle.jsx'))
+const EmergenciaForm = lazy(() => import('./pages/emergencias/EmergenciaForm.jsx'))
+const EmergenciasLista = lazy(() => import('./pages/emergencias/EmergenciasLista.jsx'))
+const ProcedimientoForm = lazy(() => import('./pages/procedimientos/ProcedimientoForm.jsx'))
+const ProcedimientosLista = lazy(() => import('./pages/procedimientos/ProcedimientosLista.jsx'))
+const TriajeForm = lazy(() => import('./pages/triaje/TriajeForm.jsx'))
+const TriajeLista = lazy(() => import('./pages/triaje/TriajeLista.jsx'))
+const PacienteDetalle = lazy(() => import('./pages/pacientes/PacienteDetalle.jsx'))
+const PacienteForm = lazy(() => import('./pages/pacientes/PacienteForm.jsx'))
+const PacientesLista = lazy(() => import('./pages/pacientes/PacientesLista.jsx'))
 
 const permisosPacientes = obtenerModulo('pacientes').permisos
 const permisosEmergencia = obtenerModulo('emergencia').permisos
@@ -63,9 +70,13 @@ const permisosTratamientos = obtenerModulo('tratamientos').permisos
 const permisosFacturas = obtenerModulo('facturas').permisos
 const permisosCuentas = obtenerModulo('cuentas').permisos
 const permisosPagos = obtenerModulo('pagos').permisos
+const permisosPersonal = obtenerModulo('personal').permisos
+const permisosCatalogos = obtenerModulo('catalogos').permisos
+const permisosUsuarios = obtenerModulo('usuarios').permisos
 
 export default function App() {
   return (
+    <Suspense fallback={<Loading pantallaCompleta texto="Cargando..." />}>
     <Routes>
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<Login />} />
@@ -224,11 +235,31 @@ export default function App() {
             <Route path="/pagos" element={<PagosLista />} />
           </Route>
 
+          <Route element={<RoleRoute roles={permisosPersonal.ver} />}>
+            <Route path="/personal" element={<PersonalPagina />} />
+            <Route path="/personal/medicos/:id" element={<MedicoDetalle />} />
+          </Route>
+          <Route element={<RoleRoute roles={permisosPersonal.crear} />}>
+            <Route path="/personal/medicos/nuevo" element={<MedicoForm />} />
+          </Route>
+          <Route element={<RoleRoute roles={permisosPersonal.editar} />}>
+            <Route path="/personal/medicos/:id/editar" element={<MedicoForm />} />
+          </Route>
+
+          <Route element={<RoleRoute roles={permisosCatalogos.ver} />}>
+            <Route path="/catalogos" element={<CatalogosPagina />} />
+          </Route>
+
+          <Route element={<RoleRoute roles={permisosUsuarios.ver} />}>
+            <Route path="/usuarios" element={<UsuariosPagina />} />
+          </Route>
+
           <Route path="/no-autorizado" element={<NoAutorizado />} />
           <Route path="/inicio" element={<Navigate to="/" replace />} />
           <Route path="*" element={<NoEncontrado />} />
         </Route>
       </Route>
     </Routes>
+    </Suspense>
   )
 }

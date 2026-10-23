@@ -1,5 +1,6 @@
 package com.example.hospital.tiposangre;
 
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -45,7 +46,7 @@ public class TipoSangreController {
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     @Operation(summary = "Registrar tipo de sangre", description = "Agrega un tipo de sangre al catálogo.\n\nRoles permitidos: ADMIN.")
-    public ResponseEntity<TipoSangreDTO> crear(@RequestBody TipoSangreDTO dto) {
+    public ResponseEntity<TipoSangreDTO> crear(@Valid @RequestBody TipoSangreDTO dto) {
         TipoSangreDTO creado = tipoSangreService.crear(dto);
         return new ResponseEntity<>(creado, HttpStatus.CREATED);
     }
@@ -56,7 +57,7 @@ public class TipoSangreController {
     @Operation(summary = "Actualizar tipo de sangre", description = "Modifica un tipo de sangre.\n\nRoles permitidos: ADMIN.")
     public ResponseEntity<TipoSangreDTO> actualizar(
             @PathVariable Long id,
-            @RequestBody TipoSangreDTO dto) {
+            @Valid @RequestBody TipoSangreDTO dto) {
         TipoSangreDTO actualizado = tipoSangreService.actualizar(dto, id);
         return ResponseEntity.ok(actualizado);
     }

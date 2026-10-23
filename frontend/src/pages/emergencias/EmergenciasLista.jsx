@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { listarEmergencias } from '../../api/emergencias.js'
 import { useAuth } from '../../auth/useAuth.js'
 import Badge from '../../components/Badge.jsx'
@@ -28,7 +28,9 @@ export default function EmergenciasLista() {
   const [idPaciente, setIdPaciente] = useState('')
   const [idMedico, setIdMedico] = useState('')
   const [idTriaje, setIdTriaje] = useState('')
-  const [estado, setEstado] = useState('')
+  const [params] = useSearchParams()
+  // ?estado=abierta (enlace de "Emergencias en curso" en Inicio)
+  const [estado, setEstado] = useState(['abierta', 'cerrada'].includes(params.get('estado')) ? params.get('estado') : '')
   const [texto, setTexto] = useState('')
   const [incluirInactivas, setIncluirInactivas] = useState(false)
   const [pagina, setPagina] = useState(1)

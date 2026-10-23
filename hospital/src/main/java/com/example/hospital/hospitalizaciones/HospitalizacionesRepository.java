@@ -23,9 +23,13 @@ public interface HospitalizacionesRepository extends JpaRepository<Hospitalizaci
 
     boolean existsByIdMedicoResponsable(Long idMedico);
 
+    boolean existsByIdClinicaAndIdEstadoHosp(Long idClinica, Long idEstadoHosp);
+
     boolean existsByIdMedicoResponsableAndIdEstadoHosp(Long idMedico, Long idEstadoHosp);
 
     boolean existsByIdEstadoHosp(Long id);
 
     long countByIdEstadoHosp(Long idEstadoHosp);
+
+    long countByIdEstadoHospAndActivoTrue(Long idEstadoHosp);
 }

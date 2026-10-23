@@ -1,5 +1,8 @@
 package com.example.hospital.paciente;
 
+import static org.mockito.Mockito.lenient;
+import org.junit.jupiter.api.BeforeEach;
+import com.example.hospital.shared.catalogos.EstadosCatalogo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,7 +44,14 @@ class PacienteServiceImplTest {
     @Mock EmergenciaRepository emergenciaRepository;
     @Mock CuentasRepository cuentasRepository;
     @Spy PacienteMapper mapper = new PacienteMapper();
+    @Mock EstadosCatalogo estados;
     @InjectMocks PacienteServiceImpl service;
+
+    @BeforeEach
+    void catalogo() {
+        // El estado Activa se resuelve por nombre: aquí le corresponde el id 1
+        lenient().when(estados.hospActiva()).thenReturn(1L);
+    }
 
     private PacienteRequest request(String dpi, Long idTipoSangre) {
         return new PacienteRequest(dpi, "Ana", "López", "Pérez", LocalDate.of(1990, 5, 10),

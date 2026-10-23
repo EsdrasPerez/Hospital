@@ -11,6 +11,7 @@ import { puede } from '../../config/menu.js'
 import PacienteHospitalizaciones from '../hospitalizaciones/PacienteHospitalizaciones.jsx'
 import { normalizarError } from '../../utils/errores.js'
 import { calcularEdad, formatearFecha, formatearFechaHora } from '../../utils/formato.js'
+import HistorialPaciente from './HistorialPaciente.jsx'
 import { nombreCompleto } from './utilsPaciente.js'
 
 export default function PacienteDetalle() {
@@ -164,6 +165,8 @@ export default function PacienteDetalle() {
           <Dato etiqueta="Estado">{p.activo === false ? 'Inactivo' : 'Activo'}</Dato>
         </div>
       </div>
+
+      {puede(rol, 'pacientes', 'historial') && <HistorialPaciente idPaciente={p.idPaciente} />}
 
       {puede(rol, 'hospitalizaciones', 'ver') && <PacienteHospitalizaciones idPaciente={p.idPaciente} />}
 

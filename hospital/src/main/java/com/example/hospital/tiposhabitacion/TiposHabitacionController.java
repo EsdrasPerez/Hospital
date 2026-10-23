@@ -1,5 +1,6 @@
 package com.example.hospital.tiposhabitacion;
 
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -42,7 +43,7 @@ public class TiposHabitacionController {
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     @Operation(summary = "Registrar tipo de habitación", description = "Agrega un tipo de habitación al catálogo.\n\nRoles permitidos: ADMIN.")
-    public ResponseEntity<TiposHabitacionDTO> crear(@RequestBody TiposHabitacionDTO dto) {
+    public ResponseEntity<TiposHabitacionDTO> crear(@Valid @RequestBody TiposHabitacionDTO dto) {
         TiposHabitacionDTO creado = tiposHabitacionService.crear(dto);
         return new ResponseEntity<>(creado, HttpStatus.CREATED);
     }
@@ -52,7 +53,7 @@ public class TiposHabitacionController {
     @Operation(summary = "Actualizar tipo de habitación", description = "Modifica un tipo de habitación.\n\nRoles permitidos: ADMIN.")
     public ResponseEntity<TiposHabitacionDTO> actualizar(
             @PathVariable Long id,
-            @RequestBody TiposHabitacionDTO dto) {
+            @Valid @RequestBody TiposHabitacionDTO dto) {
         TiposHabitacionDTO actualizado = tiposHabitacionService.actualizar(dto, id);
         return ResponseEntity.ok(actualizado);
     }

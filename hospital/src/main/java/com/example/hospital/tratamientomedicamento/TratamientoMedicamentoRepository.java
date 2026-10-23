@@ -9,4 +9,6 @@ public interface TratamientoMedicamentoRepository
     boolean existsByIdMedicamento(Long idMedicamento);
 
     boolean existsByIdTratamiento(Long idTratamiento);
+
+    java.util.List<TratamientoMedicamento> findByIdTratamiento(Long idTratamiento);
 }

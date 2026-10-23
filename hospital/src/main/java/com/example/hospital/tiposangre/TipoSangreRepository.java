@@ -16,5 +16,9 @@ public interface TipoSangreRepository extends JpaRepository<TipoSangre, Long> {
 
     Optional<TipoSangre> findByDescripcionIgnoreCase(String descripcion);
 
+    boolean existsByNombreIgnoreCase(String nombre);
+
+    boolean existsByNombreIgnoreCaseAndIdTipoDeSangreNot(String nombre, Long idTipoDeSangre);
+
     List<TipoSangre> findByActivoTrue();
 }

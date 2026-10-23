@@ -1,5 +1,9 @@
 package com.example.hospital.departamentos.impl;
 
+import com.example.hospital.enfermeros.EnfermerosRepository;
+import com.example.hospital.clinicas.ClinicasRepository;
+import com.example.hospital.shared.exception.DuplicadoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.departamentos.Departamentos;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
 import com.example.hospital.departamentos.DepartamentosRepository;
@@ -15,9 +19,15 @@ import java.util.stream.Collectors;
 public class DepartamentosServiceImpl implements DepartamentosService {
 
     private final DepartamentosRepository departamentosRepository;
+    private final ClinicasRepository clinicasRepository;
+    private final EnfermerosRepository enfermerosRepository;
 
-    public DepartamentosServiceImpl(DepartamentosRepository departamentosRepository) {
+    public DepartamentosServiceImpl(DepartamentosRepository departamentosRepository,
+                                    ClinicasRepository clinicasRepository,
+                                    EnfermerosRepository enfermerosRepository) {
         this.departamentosRepository = departamentosRepository;
+        this.clinicasRepository = clinicasRepository;
+        this.enfermerosRepository = enfermerosRepository;
     }
 
     private DepartamentosDTO mapToDTO(Departamentos d) {
@@ -35,14 +45,14 @@ public class DepartamentosServiceImpl implements DepartamentosService {
         d.setNombre(dto.nombre() != null ? dto.nombre().trim() : null);
         d.setDescripcion(dto.descripcion() != null ? dto.descripcion().trim() : null);
         d.setTelefono(dto.telefono() != null ? dto.telefono().trim() : null);
-        d.setEstado(dto.estado());
+        d.setEstado(dto.estado() != null ? dto.estado() : true); // activo por defecto al crear
         return d;
     }
 
     private void validarDatos(DepartamentosDTO dto, Long idActual) {
         // RN-022: El nombre del departamento es obligatorio
         if (dto == null || dto.nombre() == null || dto.nombre().trim().isEmpty()) {
-            throw new IllegalArgumentException("RN-022: El nombre del departamento es obligatorio");
+            throw new ReglaNegocioException("RN-022: El nombre del departamento es obligatorio");
         }
 
         String nombreLimpio = dto.nombre().trim();
@@ -56,7 +66,7 @@ public class DepartamentosServiceImpl implements DepartamentosService {
         }
 
         if (duplicado) {
-            throw new IllegalArgumentException("RN-023: Ya existe un departamento con el nombre: " + nombreLimpio);
+            throw new DuplicadoException("RN-023: Ya existe un departamento con el nombre: " + nombreLimpio);
         }
     }
 
@@ -93,7 +103,7 @@ public class DepartamentosServiceImpl implements DepartamentosService {
     @Transactional
     public DepartamentosDTO actualizar(DepartamentosDTO dto, Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID del departamento es obligatorio");
+            throw new ReglaNegocioException("El ID del departamento es obligatorio");
         }
 
         Departamentos existente = departamentosRepository.findById(id)
@@ -116,11 +126,19 @@ public class DepartamentosServiceImpl implements DepartamentosService {
     @Transactional
     public void eliminar(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID del departamento es obligatorio");
+            throw new ReglaNegocioException("El ID del departamento es obligatorio");
         }
 
         Departamentos existente = departamentosRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe el departamento con ID: " + id));
+
+        // Conflicto con dependencias: clínicas o enfermeros activos del departamento
+        if (clinicasRepository.existsByIdDepartamentoAndEstadoClinicaTrue(id)) {
+            throw new DuplicadoException("No se puede eliminar el departamento porque tiene clínicas activas asociadas");
+        }
+        if (enfermerosRepository.existsByIdDepartamentoAndActivoTrue(id)) {
+            throw new DuplicadoException("No se puede eliminar el departamento porque tiene enfermeros activos asignados");
+        }
 
         // RN-024: Eliminación lógica
         existente.setEstado(false);

@@ -16,5 +16,9 @@ public interface EstadoCitaRepository extends JpaRepository<EstadoCita, Long> {
 
     Optional<EstadoCita> findByDescripcionIgnoreCase(String descripcion);
 
+    boolean existsByNombreIgnoreCase(String nombre);
+
+    boolean existsByNombreIgnoreCaseAndIdEstadoNot(String nombre, Long idEstado);
+
     List<EstadoCita> findByActivoTrue();
 }

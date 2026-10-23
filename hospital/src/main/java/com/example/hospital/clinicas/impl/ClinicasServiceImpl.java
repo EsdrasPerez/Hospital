@@ -1,5 +1,9 @@
 package com.example.hospital.clinicas.impl;
 
+import com.example.hospital.shared.catalogos.EstadosCatalogo;
+import com.example.hospital.hospitalizaciones.HospitalizacionesRepository;
+import com.example.hospital.shared.exception.DuplicadoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.clinicas.Clinicas;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
 import com.example.hospital.clinicas.ClinicasRepository;
@@ -19,10 +23,18 @@ public class ClinicasServiceImpl implements ClinicasService {
     private final ClinicasRepository clinicasRepository;
     private final DepartamentosRepository departamentosRepository;
 
+    private final HospitalizacionesRepository hospitalizacionesRepository;
+    // Los estados (Activa) se resuelven por nombre, no por id fijo
+    private final EstadosCatalogo estados;
+
     public ClinicasServiceImpl(ClinicasRepository clinicasRepository,
-                               DepartamentosRepository departamentosRepository) {
+                               DepartamentosRepository departamentosRepository,
+                               HospitalizacionesRepository hospitalizacionesRepository,
+                               EstadosCatalogo estados) {
         this.clinicasRepository = clinicasRepository;
         this.departamentosRepository = departamentosRepository;
+        this.hospitalizacionesRepository = hospitalizacionesRepository;
+        this.estados = estados;
     }
 
     private ClinicasDTO mapToDTO(Clinicas c) {
@@ -44,7 +56,7 @@ public class ClinicasServiceImpl implements ClinicasService {
         c.setDescripcion(dto.descripcion() != null ? dto.descripcion().trim() : null);
         c.setUbicacion(dto.ubicacion() != null ? dto.ubicacion().trim() : null);
         c.setTelefono(dto.telefono() != null ? dto.telefono().trim() : null);
-        c.setEstadoClinica(dto.estadoClinica());
+        c.setEstadoClinica(dto.estadoClinica() != null ? dto.estadoClinica() : true); // activo por defecto al crear
         c.setIdDepartamento(dto.idDepartamento());
         c.setIdEspecialidad(dto.idEspecialidad());
         return c;
@@ -52,12 +64,12 @@ public class ClinicasServiceImpl implements ClinicasService {
 
     private void validarDatos(ClinicasDTO dto, Long idActual) {
         if (dto == null) {
-            throw new IllegalArgumentException("Los datos de la clínica no pueden ser nulos");
+            throw new ReglaNegocioException("Los datos de la clínica no pueden ser nulos");
         }
 
         // RN-026: El nombre de la clínica debe ser obligatorio y único
         if (dto.nombre() == null || dto.nombre().trim().isEmpty()) {
-            throw new IllegalArgumentException("RN-026: El nombre de la clínica es obligatorio");
+            throw new ReglaNegocioException("RN-026: El nombre de la clínica es obligatorio");
         }
 
         String nombreLimpio = dto.nombre().trim();
@@ -69,19 +81,19 @@ public class ClinicasServiceImpl implements ClinicasService {
         }
 
         if (duplicado) {
-            throw new IllegalArgumentException("RN-026: El nombre de la clínica debe ser único. Ya existe una clínica con el nombre: " + nombreLimpio);
+            throw new DuplicadoException("RN-026: El nombre de la clínica debe ser único. Ya existe una clínica con el nombre: " + nombreLimpio);
         }
 
         // RN-025: Toda clínica debe pertenecer a un departamento existente
         if (dto.idDepartamento() == null) {
-            throw new IllegalArgumentException("RN-025: El departamento es obligatorio. Toda clínica debe pertenecer a un departamento existente");
+            throw new ReglaNegocioException("RN-025: El departamento es obligatorio. Toda clínica debe pertenecer a un departamento existente");
         }
 
         Departamentos departamento = departamentosRepository.findById(dto.idDepartamento())
-                .orElseThrow(() -> new IllegalArgumentException("RN-025: El departamento con ID " + dto.idDepartamento() + " no existe"));
+                .orElseThrow(() -> new ReglaNegocioException("RN-025: El departamento con ID " + dto.idDepartamento() + " no existe"));
 
         if (departamento.getEstado() != null && !departamento.getEstado()) {
-            throw new IllegalArgumentException("RN-025: El departamento seleccionado se encuentra inactivo");
+            throw new ReglaNegocioException("RN-025: El departamento seleccionado se encuentra inactivo");
         }
     }
 
@@ -126,7 +138,7 @@ public class ClinicasServiceImpl implements ClinicasService {
     @Transactional
     public ClinicasDTO actualizar(ClinicasDTO dto, Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID de la clínica es obligatorio");
+            throw new ReglaNegocioException("El ID de la clínica es obligatorio");
         }
 
         Clinicas existente = clinicasRepository.findById(id)
@@ -153,11 +165,16 @@ public class ClinicasServiceImpl implements ClinicasService {
     @Transactional
     public void eliminar(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID de la clínica es obligatorio");
+            throw new ReglaNegocioException("El ID de la clínica es obligatorio");
         }
 
         Clinicas existente = clinicasRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe la clínica con ID: " + id));
+
+        // Conflicto con dependencias: hospitalizaciones en curso en la clínica
+        if (hospitalizacionesRepository.existsByIdClinicaAndIdEstadoHosp(id, estados.hospActiva())) {
+            throw new DuplicadoException("No se puede eliminar la clínica porque tiene hospitalizaciones activas");
+        }
 
         // RN-028: Eliminación lógica
         existente.setEstadoClinica(false);
@@ -168,14 +185,14 @@ public class ClinicasServiceImpl implements ClinicasService {
     public void validarClinicaActivaParaAtencion(Long idClinica) {
         // RN-027: Solo se podrán asignar nuevas atenciones a clínicas activas
         if (idClinica == null) {
-            throw new IllegalArgumentException("RN-027: El identificador de la clínica es obligatorio");
+            throw new ReglaNegocioException("RN-027: El identificador de la clínica es obligatorio");
         }
 
         Clinicas clinica = clinicasRepository.findById(idClinica)
-                .orElseThrow(() -> new IllegalArgumentException("RN-027: La clínica con ID " + idClinica + " no existe"));
+                .orElseThrow(() -> new ReglaNegocioException("RN-027: La clínica con ID " + idClinica + " no existe"));
 
         if (clinica.getEstadoClinica() == null || !clinica.getEstadoClinica()) {
-            throw new IllegalStateException("RN-027: Solo se podrán asignar nuevas atenciones a clínicas activas. La clínica '" +
+            throw new ReglaNegocioException("RN-027: Solo se podrán asignar nuevas atenciones a clínicas activas. La clínica '" +
                     clinica.getNombre() + "' está inactiva");
         }
     }

@@ -6,7 +6,7 @@ const COLORES = { error: 'danger', exito: 'success', aviso: 'warning' }
 export default function ErrorAlert({ mensaje, titulo, onCerrar, tipo = 'error' }) {
   if (!mensaje) return null
   return (
-    <Alert color={COLORES[tipo] ?? 'danger'} fade={false} toggle={onCerrar} role={tipo === 'error' ? 'alert' : 'status'} className="mb-3">
+    <Alert color={COLORES[tipo] ?? 'danger'} fade={false} toggle={onCerrar} closeAriaLabel="Cerrar" role={tipo === 'error' ? 'alert' : 'status'} className="mb-3">
       {titulo && <strong className="d-block">{titulo}</strong>}
       {mensaje}
     </Alert>

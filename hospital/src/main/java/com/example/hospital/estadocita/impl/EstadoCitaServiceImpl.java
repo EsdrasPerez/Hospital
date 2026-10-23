@@ -65,8 +65,23 @@ public class EstadoCitaServiceImpl implements EstadoCitaService {
         EstadoCita e = new EstadoCita();
         e.setNombre(dto.nombre());
         e.setDescripcion(dto.descripcion() != null ? dto.descripcion().trim() : null);
-        e.setActivo(dto.activo());
+        e.setActivo(dto.activo() != null ? dto.activo() : true); // activo por defecto al crear
         return e;
+    }
+
+    /** Nombre efectivo: el enviado o, si falta, la descripción; máximo 30 caracteres y único (409 si se repite). */
+    private String validarNombre(String nombre, String descripcion, Long idActual) {
+        String efectivo = nombre == null || nombre.isBlank() ? descripcion : nombre.trim();
+        if (efectivo == null || efectivo.length() > 30) {
+            throw new ReglaNegocioException("El nombre del estado no puede superar los 30 caracteres");
+        }
+        boolean duplicado = idActual == null
+                ? estadoCitaRepository.existsByNombreIgnoreCase(efectivo)
+                : estadoCitaRepository.existsByNombreIgnoreCaseAndIdEstadoNot(efectivo, idActual);
+        if (duplicado) {
+            throw new DuplicadoException("Ya existe un estado de cita con el nombre: " + efectivo);
+        }
+        return efectivo;
     }
 
     private String normalizar(String descripcion) {
@@ -120,9 +135,8 @@ public class EstadoCitaServiceImpl implements EstadoCitaService {
 
         EstadoCita entity = mapToEntity(dto);
         entity.setDescripcion(canonico);
-        if (entity.getNombre() == null || entity.getNombre().isBlank()) {
-            entity.setNombre(canonico);
-        }
+        // `nombre` es NOT NULL y UNIQUE (30 caracteres): si falta se copia de la descripción
+        entity.setNombre(validarNombre(dto.nombre(), canonico, null));
         if (entity.getActivo() == null) {
             entity.setActivo(true);
         }
@@ -160,8 +174,8 @@ public class EstadoCitaServiceImpl implements EstadoCitaService {
             existente.setDescripcion(canonico);
         }
 
-        if (dto.nombre() != null) {
-            existente.setNombre(dto.nombre());
+        if (dto.nombre() != null && !dto.nombre().isBlank()) {
+            existente.setNombre(validarNombre(dto.nombre(), existente.getDescripcion(), id));
         }
         if (dto.activo() != null) {
             existente.setActivo(dto.activo());

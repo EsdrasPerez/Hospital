@@ -1,5 +1,8 @@
 package com.example.hospital.medico;
 
+import static org.mockito.Mockito.lenient;
+import org.junit.jupiter.api.BeforeEach;
+import com.example.hospital.shared.catalogos.EstadosCatalogo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,7 +31,14 @@ class MedicoServiceImplTest {
     @Mock CitasRepository citasRepository;
     @Mock HospitalizacionesRepository hospitalizacionesRepository;
     @Mock EmergenciaRepository emergenciaRepository;
+    @Mock EstadosCatalogo estados;
     @InjectMocks MedicoServiceImpl service;
+
+    @BeforeEach
+    void catalogo() {
+        // El estado Activa se resuelve por nombre: aquí le corresponde el id 1
+        lenient().when(estados.hospActiva()).thenReturn(1L);
+    }
 
     private MedicoDTO dto(String colegiado, String nombre, String email, String telefono) {
         return new MedicoDTO(null, colegiado, nombre, "Perez", null, telefono, email, null);
@@ -142,5 +152,43 @@ class MedicoServiceImplTest {
         assertThat(service.buscar("  ")).hasSize(1);
         verify(medicoRepository, never())
                 .findByNombreContainingIgnoreCaseOrApellidoPaternoContainingIgnoreCase(any(), any());
+    }
+
+    private Medico medicoNombre(Long id, String nombre, String apellido, String colegiado, boolean activo) {
+        Medico m = medico(id, activo);
+        m.setNombre(nombre);
+        m.setApellidoPaterno(apellido);
+        m.setNoColegiado(colegiado);
+        return m;
+    }
+
+    @Test
+    void buscar_combinaCriterioYSoloActivos_ybuscaTambienPorColegiado() {
+        when(medicoRepository.findAll()).thenReturn(List.of(
+                medicoNombre(1L, "Marta", "Ramirez", "COL-9001", true),
+                medicoNombre(2L, "Pedro", "Gomez", "COL-7001", true),
+                medicoNombre(3L, "Pablo", "Inactivo", "COL-7002", false)));
+
+        assertThat(service.buscar(null, false)).extracting(MedicoDTO::idMedico).containsExactly(1L, 2L, 3L);
+        assertThat(service.buscar(null, true)).extracting(MedicoDTO::idMedico).containsExactly(1L, 2L);
+        assertThat(service.buscar("col-7", false)).extracting(MedicoDTO::idMedico).containsExactly(2L, 3L);
+        assertThat(service.buscar("col-7", true)).extracting(MedicoDTO::idMedico).containsExactly(2L);
+        assertThat(service.buscar("RAMIREZ", true)).extracting(MedicoDTO::idMedico).containsExactly(1L);
+        // el criterio respeta soloActivos: un inactivo se encuentra solo si no se pide soloActivos
+        assertThat(service.buscar("inactivo", true)).isEmpty();
+        assertThat(service.buscar("inactivo", false)).extracting(MedicoDTO::idMedico).containsExactly(3L);
+    }
+
+    @Test
+    void crear_lanza409_siElColegiadoOElCorreoYaExisten() {
+        when(medicoRepository.existsByNoColegiado("COL-1")).thenReturn(true);
+        MedicoDTO dto = new MedicoDTO(null, "COL-1", "Ana", "Perez", null, null, null, null);
+
+        assertThrows(com.example.hospital.shared.exception.DuplicadoException.class, () -> service.crear(dto));
+
+        when(medicoRepository.existsByNoColegiado("COL-2")).thenReturn(false);
+        when(medicoRepository.existsByEmailIgnoreCase("a@b.com")).thenReturn(true);
+        assertThrows(com.example.hospital.shared.exception.DuplicadoException.class,
+                () -> service.crear(new MedicoDTO(null, "COL-2", "Ana", "Perez", null, null, "a@b.com", null)));
     }
 }

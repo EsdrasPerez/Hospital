@@ -1,5 +1,7 @@
 package com.example.hospital.metodospago.impl;
 
+import com.example.hospital.pagos.PagosRepository;
+import com.example.hospital.facturas.FacturasRepository;
 import com.example.hospital.metodospago.MetodosPago;
 import com.example.hospital.metodospago.MetodosPagoRepository;
 import com.example.hospital.metodospago.MetodosPagoService;
@@ -17,9 +19,15 @@ import java.util.stream.Collectors;
 public class MetodosPagoServiceImpl implements MetodosPagoService {
 
     private final MetodosPagoRepository metodosPagoRepository;
+    private final FacturasRepository facturasRepository;
+    private final PagosRepository pagosRepository;
 
-    public MetodosPagoServiceImpl(MetodosPagoRepository metodosPagoRepository) {
+    public MetodosPagoServiceImpl(MetodosPagoRepository metodosPagoRepository,
+                                  FacturasRepository facturasRepository,
+                                  PagosRepository pagosRepository) {
         this.metodosPagoRepository = metodosPagoRepository;
+        this.facturasRepository = facturasRepository;
+        this.pagosRepository = pagosRepository;
     }
 
     private MetodosPagoDTO mapToDTO(MetodosPago e) {
@@ -90,6 +98,10 @@ public class MetodosPagoServiceImpl implements MetodosPagoService {
     @Transactional
     public void eliminar(Long id) {
         MetodosPago existente = buscar(id);
+        // Conflicto con dependencias (como documenta el Swagger): facturas o pagos que usan el método
+        if (facturasRepository.existsByIdMetodoPago(id) || pagosRepository.existsByIdMetodoPago(id)) {
+            throw new DuplicadoException("No se puede eliminar el método de pago porque lo usan facturas o pagos");
+        }
         // Eliminación lógica para conservar el historial
         existente.setActivo(false);
         metodosPagoRepository.save(existente);

@@ -1,5 +1,6 @@
 package com.example.hospital.paciente.impl;
 
+import com.example.hospital.shared.catalogos.EstadosCatalogo;
 import com.example.hospital.alergias.Alergias;
 import com.example.hospital.alergias.AlergiasRepository;
 import com.example.hospital.citas.CitasRepository;
@@ -30,8 +31,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PacienteServiceImpl implements PacienteService {
 
-    private static final Long ESTADO_HOSP_ACTIVA = 1L;
-
     private final PacienteRepository repository;
     private final AlergiasRepository alergiasRepository;
     private final TipoSangreRepository tipoSangreRepository;
@@ -40,6 +39,8 @@ public class PacienteServiceImpl implements PacienteService {
     private final EmergenciaRepository emergenciaRepository;
     private final CuentasRepository cuentasRepository;
     private final PacienteMapper mapper;
+    // El estado de hospitalización Activa se resuelve por nombre, no por id fijo
+    private final EstadosCatalogo estados;
 
     @Override
     @Transactional(readOnly = true)
@@ -162,7 +163,7 @@ public class PacienteServiceImpl implements PacienteService {
             throw new ReglaNegocioException("No se puede desactivar el paciente porque tiene citas médicas activas.");
         }
 
-        if (hospitalizacionesRepository.existsByIdPacienteAndIdEstadoHosp(id, ESTADO_HOSP_ACTIVA)) {
+        if (hospitalizacionesRepository.existsByIdPacienteAndIdEstadoHosp(id, estados.hospActiva())) {
             throw new ReglaNegocioException("No se puede desactivar el paciente porque tiene una hospitalización activa en curso.");
         }
 

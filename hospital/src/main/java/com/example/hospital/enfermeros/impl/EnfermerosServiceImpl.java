@@ -1,5 +1,7 @@
 package com.example.hospital.enfermeros.impl;
 
+import com.example.hospital.shared.exception.DuplicadoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.asignacionenfermeros.AsignacionEnfermerosRepository;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
 import com.example.hospital.departamentos.Departamentos;
@@ -50,26 +52,26 @@ public class EnfermerosServiceImpl implements EnfermerosService {
         e.setApellidoMaterno(dto.apellidoMaterno() != null ? dto.apellidoMaterno().trim() : null);
         e.setTelefono(dto.telefono() != null ? dto.telefono().trim() : null);
         e.setIdDepartamento(dto.idDepartamento());
-        e.setActivo(dto.activo());
+        e.setActivo(dto.activo() != null ? dto.activo() : true); // activo por defecto al crear
         return e;
     }
 
     private void validarDatos(EnfermerosDTO dto, Long idActual) {
         if (dto == null) {
-            throw new IllegalArgumentException("Los datos del enfermero no pueden ser nulos");
+            throw new ReglaNegocioException("Los datos del enfermero no pueden ser nulos");
         }
 
         // RN: Cédula profesional obligatoria
         if (dto.cedulaProfesional() == null || dto.cedulaProfesional().trim().isEmpty()) {
-            throw new IllegalArgumentException("La cédula profesional del enfermero es obligatoria");
+            throw new ReglaNegocioException("La cédula profesional del enfermero es obligatoria");
         }
 
         // RN: Nombre y apellido paterno obligatorios
         if (dto.nombre() == null || dto.nombre().trim().isEmpty()) {
-            throw new IllegalArgumentException("El nombre del enfermero es obligatorio");
+            throw new ReglaNegocioException("El nombre del enfermero es obligatorio");
         }
         if (dto.apellidoPaterno() == null || dto.apellidoPaterno().trim().isEmpty()) {
-            throw new IllegalArgumentException("El apellido paterno del enfermero es obligatorio");
+            throw new ReglaNegocioException("El apellido paterno del enfermero es obligatorio");
         }
 
         // RN: Unicidad de cédula profesional
@@ -82,19 +84,19 @@ public class EnfermerosServiceImpl implements EnfermerosService {
         }
 
         if (cedulaDuplicada) {
-            throw new IllegalArgumentException("Ya existe un enfermero registrado con la cédula profesional: " + cedulaLimpia);
+            throw new DuplicadoException("Ya existe un enfermero registrado con la cédula profesional: " + cedulaLimpia);
         }
 
         // RN: El departamento debe existir y estar activo
         if (dto.idDepartamento() == null) {
-            throw new IllegalArgumentException("El departamento es obligatorio para el enfermero");
+            throw new ReglaNegocioException("El departamento es obligatorio para el enfermero");
         }
 
         Departamentos departamento = departamentosRepository.findById(dto.idDepartamento())
-                .orElseThrow(() -> new IllegalArgumentException("El departamento con ID " + dto.idDepartamento() + " no existe"));
+                .orElseThrow(() -> new ReglaNegocioException("El departamento con ID " + dto.idDepartamento() + " no existe"));
 
         if (departamento.getEstado() != null && !departamento.getEstado()) {
-            throw new IllegalArgumentException("El departamento seleccionado se encuentra inactivo");
+            throw new ReglaNegocioException("El departamento seleccionado se encuentra inactivo");
         }
     }
 
@@ -139,7 +141,7 @@ public class EnfermerosServiceImpl implements EnfermerosService {
     @Transactional
     public EnfermerosDTO actualizar(EnfermerosDTO dto, Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID del enfermero es obligatorio");
+            throw new ReglaNegocioException("El ID del enfermero es obligatorio");
         }
 
         Enfermeros existente = enfermerosRepository.findById(id)
@@ -165,11 +167,16 @@ public class EnfermerosServiceImpl implements EnfermerosService {
     @Transactional
     public void eliminar(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID del enfermero es obligatorio");
+            throw new ReglaNegocioException("El ID del enfermero es obligatorio");
         }
 
         Enfermeros existente = enfermerosRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe el enfermero con ID: " + id));
+
+        // Conflicto con dependencias: asignaciones activas a hospitalizaciones
+        if (asignacionEnfermerosRepository.existsByIdEnfermeroAndActivoTrue(id)) {
+            throw new DuplicadoException("No se puede eliminar el enfermero porque tiene asignaciones activas");
+        }
 
         // Borrado lógico (conserva el historial de asignaciones y turnos)
         existente.setActivo(false);

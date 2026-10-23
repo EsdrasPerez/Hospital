@@ -24,4 +24,8 @@ public interface ClinicasRepository extends JpaRepository<Clinicas, Long> {
 
     // Validar si una especialidad tiene clínicas asociadas
     boolean existsByIdEspecialidad(Long idEspecialidad);
+
+    boolean existsByIdDepartamentoAndEstadoClinicaTrue(Long idDepartamento);
+
+    boolean existsByIdEspecialidadAndEstadoClinicaTrue(Long idEspecialidad);
 }

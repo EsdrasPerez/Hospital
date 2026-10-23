@@ -1,5 +1,6 @@
 package com.example.hospital.turnos;
 
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -44,7 +45,7 @@ public class TurnosController {
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     @Operation(summary = "Registrar turno", description = "Crea un nuevo turno. La descripción no puede repetirse.\n\nRoles permitidos: ADMIN.")
-    public ResponseEntity<TurnosDTO> registrar(@RequestBody TurnosDTO dto) {
+    public ResponseEntity<TurnosDTO> registrar(@Valid @RequestBody TurnosDTO dto) {
         TurnosDTO creado = turnosService.registrar(dto);
         return new ResponseEntity<>(creado, HttpStatus.CREATED);
     }
@@ -54,7 +55,7 @@ public class TurnosController {
     @Operation(summary = "Actualizar turno", description = "Modifica un turno.\n\nRoles permitidos: ADMIN.")
     public ResponseEntity<TurnosDTO> update(
             @PathVariable Long id,
-            @RequestBody TurnosDTO dto) {
+            @Valid @RequestBody TurnosDTO dto) {
         TurnosDTO actualizado = turnosService.actualizar(dto, id);
         return ResponseEntity.ok(actualizado);
     }

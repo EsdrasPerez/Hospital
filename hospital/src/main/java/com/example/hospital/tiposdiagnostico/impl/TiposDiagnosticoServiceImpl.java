@@ -1,5 +1,7 @@
 package com.example.hospital.tiposdiagnostico.impl;
 
+import com.example.hospital.shared.exception.DuplicadoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.diagnosticos.DiagnosticosRepository;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
 import com.example.hospital.tiposdiagnostico.TiposDiagnostico;
@@ -45,7 +47,7 @@ public class TiposDiagnosticoServiceImpl implements TiposDiagnosticoService {
     private TiposDiagnostico mapToEntity(TiposDiagnosticoDTO dto) {
         TiposDiagnostico t = new TiposDiagnostico();
         t.setDescripcion(dto.descripcion() != null ? dto.descripcion().trim() : null);
-        t.setActivo(dto.activo());
+        t.setActivo(dto.activo() != null ? dto.activo() : true); // activo por defecto al crear
         return t;
     }
 
@@ -78,13 +80,13 @@ public class TiposDiagnosticoServiceImpl implements TiposDiagnosticoService {
     @Transactional
     public TiposDiagnosticoDTO crear(TiposDiagnosticoDTO dto) {
         if (dto == null || dto.descripcion() == null || dto.descripcion().trim().isEmpty()) {
-            throw new IllegalArgumentException("La descripción del tipo de diagnóstico es obligatoria");
+            throw new ReglaNegocioException("La descripción del tipo de diagnóstico es obligatoria");
         }
 
         String canonico = obtenerNombreCanonica(dto.descripcion());
 
         if (tiposDiagnosticoRepository.existsByDescripcionIgnoreCase(canonico)) {
-            throw new IllegalArgumentException("Ya existe un tipo de diagnóstico con la descripción: " + canonico);
+            throw new DuplicadoException("Ya existe un tipo de diagnóstico con la descripción: " + canonico);
         }
 
         TiposDiagnostico entity = mapToEntity(dto);
@@ -101,7 +103,7 @@ public class TiposDiagnosticoServiceImpl implements TiposDiagnosticoService {
     @Transactional
     public TiposDiagnosticoDTO actualizar(TiposDiagnosticoDTO dto, Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID del tipo de diagnóstico es obligatorio");
+            throw new ReglaNegocioException("El ID del tipo de diagnóstico es obligatorio");
         }
 
         TiposDiagnostico existente = tiposDiagnosticoRepository.findById(id)
@@ -110,7 +112,7 @@ public class TiposDiagnosticoServiceImpl implements TiposDiagnosticoService {
         // Regla: No renombrar los tipos base del sistema
         if (TIPOS_BASE.contains(existente.getDescripcion())) {
             if (dto.descripcion() != null && !dto.descripcion().equalsIgnoreCase(existente.getDescripcion())) {
-                throw new IllegalArgumentException("No se permite renombrar el tipo de diagnóstico base '" +
+                throw new ReglaNegocioException("No se permite renombrar el tipo de diagnóstico base '" +
                         existente.getDescripcion() + "'");
             }
         }
@@ -118,7 +120,7 @@ public class TiposDiagnosticoServiceImpl implements TiposDiagnosticoService {
         if (dto.descripcion() != null && !dto.descripcion().trim().isEmpty()) {
             String canonico = obtenerNombreCanonica(dto.descripcion());
             if (tiposDiagnosticoRepository.existsByDescripcionIgnoreCaseAndIdTipoDiagnosticoNot(canonico, id)) {
-                throw new IllegalArgumentException("Ya existe otro tipo de diagnóstico con la descripción: " + canonico);
+                throw new DuplicadoException("Ya existe otro tipo de diagnóstico con la descripción: " + canonico);
             }
             existente.setDescripcion(canonico);
         }
@@ -135,7 +137,7 @@ public class TiposDiagnosticoServiceImpl implements TiposDiagnosticoService {
     @Transactional
     public void eliminar(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID del tipo de diagnóstico es obligatorio");
+            throw new ReglaNegocioException("El ID del tipo de diagnóstico es obligatorio");
         }
 
         TiposDiagnostico existente = tiposDiagnosticoRepository.findById(id)
@@ -143,14 +145,14 @@ public class TiposDiagnosticoServiceImpl implements TiposDiagnosticoService {
 
         // Regla: No eliminar tipos base
         if (TIPOS_BASE.contains(existente.getDescripcion())) {
-            throw new IllegalArgumentException("No se puede eliminar el tipo de diagnóstico base '" +
+            throw new ReglaNegocioException("No se puede eliminar el tipo de diagnóstico base '" +
                     existente.getDescripcion() + "'");
         }
 
         // Regla de integridad: No eliminar si está asignado a diagnósticos
         boolean asignado = diagnosticosRepository.existsByIdTipoDiagnostico(id);
         if (asignado) {
-            throw new IllegalArgumentException("No se puede eliminar el tipo de diagnóstico porque está asociado a uno o más diagnósticos médicos");
+            throw new DuplicadoException("No se puede eliminar el tipo de diagnóstico porque está asociado a uno o más diagnósticos médicos");
         }
 
         // Eliminación lógica

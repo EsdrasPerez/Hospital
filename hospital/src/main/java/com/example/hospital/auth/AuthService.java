@@ -7,5 +7,6 @@ import com.example.hospital.auth.dto.RegisterRequest;
 public interface AuthService {
     LoginResponse login(LoginRequest request);
 
-    void register(RegisterRequest request);
+    /** Crea el usuario y devuelve su id. */
+    Long register(RegisterRequest request);
 }

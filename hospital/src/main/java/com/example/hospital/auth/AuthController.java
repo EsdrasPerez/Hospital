@@ -41,16 +41,19 @@ public class AuthController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/register")
-    @Operation(summary = "Registrar usuario", description = "Crea un nuevo usuario de acceso al sistema con contraseña cifrada. El campo `rol` (nombre del rol) es obligatorio. Responde 400 si faltan datos (incluido el rol), 409 si el usuario ya existe y 422 si el rol no existe o está inactivo.\n\nRoles permitidos: ADMIN.")
+    @Operation(summary = "Registrar usuario", description = "Crea un nuevo usuario de acceso al sistema con contraseña cifrada. El campo `rol` (nombre del rol) es obligatorio. Política de contraseña: mínimo 8 caracteres. Devuelve `message` e `idUsuario`. Responde 400 si faltan datos o la contraseña es corta (con `detalles`), 409 si el usuario ya existe y 422 si el rol no existe o está inactivo.\n\nRoles permitidos: ADMIN.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Usuario creado"),
             @ApiResponse(responseCode = "400", description = "Datos inválidos o rol ausente"),
             @ApiResponse(responseCode = "409", description = "El usuario ya existe"),
             @ApiResponse(responseCode = "422", description = "Rol inexistente o inactivo")
     })
-    public ResponseEntity<Map<String, String>> register(@Valid @RequestBody RegisterRequest request) {
-        authService.register(request);
-        return ResponseEntity.ok(Map.of("message", "Usuario '" + request.username() + "' creado exitosamente."));
+    public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegisterRequest request) {
+        Long idUsuario = authService.register(request);
+        Map<String, Object> cuerpo = new java.util.LinkedHashMap<>();
+        cuerpo.put("message", "Usuario '" + request.username() + "' creado exitosamente.");
+        cuerpo.put("idUsuario", idUsuario);
+        return ResponseEntity.ok(cuerpo);
     }
 
     @GetMapping("/me")

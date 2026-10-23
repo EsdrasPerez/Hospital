@@ -1,7 +1,7 @@
 # Hospital - Frontend web
 
 Interfaz web del proyecto API Hospital (Arquitectura de Sistemas, UMES).
-Stack: Vite + React (JavaScript), React Router, axios, Bootstrap 4 y reactstrap con el tema Now UI Dashboard (Creative Tim).
+Stack: Vite + React 19 (JavaScript), React Router, axios, Bootstrap 4.6 y reactstrap 9 con el tema Now UI Dashboard (Creative Tim).
 
 ## Requisitos
 
@@ -19,6 +19,8 @@ npm run dev
 
 La aplicación queda en http://localhost:5173. El puerto está fijado (`strictPort`) porque es el único origen que permite el CORS del backend (`app.cors.allowed-origins`).
 
+Para entrar se necesita un usuario del backend (el administrador inicial lo crea el backend al arrancar; ver `app.admin.*` en `hospital/src/main/resources/application.properties`).
+
 ## Variables de entorno
 
 | Variable       | Descripción                     | Valor por defecto       |
@@ -28,8 +30,23 @@ La aplicación queda en http://localhost:5173. El puerto está fijado (`strictPo
 ## Scripts
 
 - `npm run dev`: servidor de desarrollo.
-- `npm run build`: compilación de producción en `dist/`.
+- `npm run build`: compilación de producción en `dist/` (las pantallas se cargan por demanda; el paquete principal pesa unos 305 kB).
 - `npm run lint`: análisis estático (oxlint).
+
+## Módulos y roles
+
+Los permisos de la interfaz salen de los `@PreAuthorize` del backend y viven en `src/config/menu.js` (cada módulo declara qué rol puede ver, crear, editar y desactivar). Las rutas usan `RoleRoute` con esos mismos permisos, y un 403 del backend se muestra como "Acceso no autorizado".
+
+| Módulo (grupo del menú)                         | Quién lo usa (resumen)                                                        |
+| ------------------------------------------------ | ----------------------------------------------------------------------------- |
+| Inicio: indicadores del día y accesos            | Todos (los indicadores según rol; FARMACEUTICO solo ve el stock bajo)         |
+| Pacientes (+ historial clínico en el detalle)    | ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA (historial clínico: ADMIN, MEDICO, ENFERMERO; cuentas y facturas dentro del historial solo ADMIN) |
+| Citas, consultas, diagnósticos, tratamientos     | Lectura para todos; escritura según el rol clínico                            |
+| Emergencia, triaje, procedimientos               | Personal clínico                                                              |
+| Hospitalizaciones, habitaciones, enfermeros asignados | Personal clínico y recepción; la administración de habitaciones es de ADMIN |
+| Farmacia: medicamentos y medicamentos recetados  | ADMIN, FARMACEUTICO, MEDICO (según operación)                                 |
+| Facturación: facturas, cuentas, pagos            | ADMIN, CAJERO y RECEPCIONISTA (los pagos solo ADMIN y CAJERO)                 |
+| Administración: personal médico, catálogos, usuarios y roles | Consulta para el personal clínico; la escritura es de ADMIN (alergias también MEDICO) |
 
 ## Estructura
 
@@ -37,21 +54,40 @@ La aplicación queda en http://localhost:5173. El puerto está fijado (`strictPo
 src/
   api/          cliente axios, rutas centralizadas (rutas.js) y una función por endpoint
   auth/         AuthProvider, useAuth, ProtectedRoute, RoleRoute
-  config/menu.js  módulos y permisos por rol (derivados de los @PreAuthorize del backend)
-  layouts/      MainLayout (sidebar + header) y AuthLayout
-  components/   Table, FormField, ErrorAlert, Loading, EmptyState, ConfirmDialog, Pagination
-  pages/        Login, Inicio, NoAutorizado, NoEncontrado y pages/pacientes
-  utils/        manejo de errores del backend y formato de fechas
+  config/       menu.js (módulos y permisos) y catalogos.js (configuración del CRUD genérico de catálogos)
+  layouts/      MainLayout (barra lateral + cabecera) y AuthLayout
+  components/   Table, FormField, ErrorAlert, Loading, ConfirmDialog, Pagination, CatalogoCrud, PacienteSelector, Pestanas...
+  hooks/        useApi y hooks de datos compartidos
+  pages/        una carpeta por módulo (lista, detalle y formulario)
+  utils/        errores del backend, formato de fechas y montos (en centavos)
 ```
+
+Las pantallas se cargan con `React.lazy` y `Suspense` (el componente `Loading` hace de respaldo).
 
 ## Notas
 
 - La sesión usa el JWT del backend (expira en 1 hora) guardado en `localStorage`. Cualquier respuesta 401 cierra la sesión y lleva a `/login`.
-- Las rutas del backend están centralizadas en `src/api/rutas.js` (Pacientes usa `/api/v1/paciente`, el resto `/api/...`).
-- Módulos implementados en esta fase: autenticación e inicio, y Pacientes. El resto de módulos están declarados en `src/config/menu.js` con `implementado: false` y se activarán en próximas fases.
+- Los errores del backend (`{ status, message, detalles }`) se normalizan en `src/utils/errores.js`: `detalles` se muestra bajo cada campo y `message` en una alerta.
+- Las fechas del backend (`LocalDate`/`LocalDateTime`, sin zona) se formatean cortando el texto, sin `Date`, para evitar desfases de zona horaria.
+- Los montos (quetzales) se calculan en centavos enteros (`src/utils/dinero.js`) para no arrastrar errores de punto flotante.
 
 ## Diseño y créditos
 
-La interfaz usa el tema **Now UI Dashboard React** v1.5.2 de [Creative Tim](https://www.creative-tim.com/product/now-ui-dashboard-react) (licencia MIT, https://github.com/creativetimofficial/now-ui-dashboard-react/tree/1.5.2). De la plantilla solo se incluyen el CSS compilado, la tipografía de iconos Nucleo y una imagen de fondo en `src/assets/now-ui/`, junto con su `LICENSE.md` (el aviso de copyright también está en la cabecera del CSS). Las pantallas y componentes son propios, escritos con `bootstrap` 4.6.2 y `reactstrap` 9.2.3.
+La interfaz usa el tema **Now UI Dashboard React** v1.5.2 de [Creative Tim](https://www.creative-tim.com/product/now-ui-dashboard-react) (licencia MIT, https://github.com/creativetimofficial/now-ui-dashboard-react/tree/1.5.2). De la plantilla solo se incluyen el CSS compilado, la tipografía de iconos Nucleo y una imagen de fondo en `src/assets/now-ui/`, junto con su `LICENSE.md` (el aviso de copyright también está en la cabecera del CSS). Las pantallas y componentes son propios, escritos con `bootstrap` 4.6.2 y `reactstrap` 9.2.3. Las gráficas son barras HTML/CSS (sin librería de gráficos).
 
-Tailwind CSS ya no se usa. La tipografía Montserrat se carga desde Google Fonts (si no hay conexión se usa la fuente del sistema).
+## Decisiones de diseño y pendientes del backend
+
+Decisiones:
+
+- La interfaz se adelanta con validaciones en cliente (campos obligatorios, tamaños, montos) pero el backend es la fuente de verdad: siempre se muestra su `message` o sus `detalles`.
+- Filtros: se envían al servidor siempre que el backend los combina; la búsqueda por texto se resuelve en el cliente cuando el backend no la ofrece.
+- Los roles son fijos del sistema y se muestran en solo lectura; los catálogos protegen los valores base (estados de cita, factura, habitación, hospitalización, tipos base).
+- Caja (CAJERO) no puede leer pacientes: usa `PacienteSelector` con los endpoints mínimos `/api/v1/paciente/busqueda` y `/{id}/resumen`.
+- Tipografía: Montserrat se carga desde Google Fonts (sin conexión se usa la fuente del sistema). Pendiente: alojar los archivos woff2 localmente.
+
+Pendientes:
+
+- Lectura abierta de datos financieros: `GET` de facturas, líneas y cuentas sigue abierto a cualquier usuario autenticado (política de lectura por definir). El historial del paciente ya omite cuentas y facturas para MEDICO y ENFERMERO.
+- No hay renovación del token: un token vigente de un usuario desactivado deja de funcionar (401), pero al expirar hay que volver a entrar.
+- Montserrat se carga desde Google Fonts; pendiente alojar los archivos woff2 localmente.
+- Faltan pruebas automáticas de interfaz (solo se probó a mano y con las pruebas unitarias del backend).

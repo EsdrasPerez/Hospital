@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { listarHabitaciones } from '../../api/habitaciones.js'
 import { listarHospitalizacionesActivas } from '../../api/hospitalizaciones.js'
 import { useAuth } from '../../auth/useAuth.js'
@@ -25,7 +25,9 @@ export default function HabitacionesLista() {
   const puedeEditar = puede(rol, 'habitaciones', 'editar')
 
   const [vista, setVista] = useState('tabla')
-  const [idEstado, setIdEstado] = useState('')
+  const [params] = useSearchParams()
+  // ?idEstado=<idEstadoHabitacion> (enlace de "Habitaciones disponibles" en Inicio)
+  const [idEstado, setIdEstado] = useState(/^\d+$/.test(params.get('idEstado') ?? '') ? params.get('idEstado') : '')
   const [idTipo, setIdTipo] = useState('')
   const [piso, setPiso] = useState('')
   const [texto, setTexto] = useState('')

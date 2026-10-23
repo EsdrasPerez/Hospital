@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { Button, Container, Navbar } from 'reactstrap'
 import { useAuth } from '../auth/useAuth.js'
+import Loading from '../components/Loading.jsx'
 import { MODULOS, menuParaRol } from '../config/menu.js'
 import { ETIQUETAS_ROL } from '../utils/formato.js'
 
@@ -107,7 +108,9 @@ export default function MainLayout() {
 
         <div className="panel-header panel-header-sm" />
         <div className="content">
-          <Outlet />
+          <Suspense fallback={<Loading texto="Cargando..." />}>
+            <Outlet />
+          </Suspense>
         </div>
       </div>
     </div>

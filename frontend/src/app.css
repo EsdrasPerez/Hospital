@@ -55,3 +55,24 @@
 .paciente-selector-lista .list-group-item.active .small { color: rgba(255, 255, 255, .85); }
 .paciente-selector-compacto { min-width: 15rem; display: inline-block; }
 .acciones-filtros .paciente-selector-compacto .form-control { width: 100%; }
+
+/* Administración: pestañas y muestra de color */
+.pestanas-admin { flex-wrap: wrap; border-bottom: 1px solid #e3e3e3; }
+.pestanas-admin .nav-link { background: none; border: 0; border-bottom: 2px solid transparent; color: #66615b; padding: .6rem .9rem; cursor: pointer; }
+.pestanas-admin .nav-link:hover { color: #2c2c2c; }
+.pestanas-admin .nav-link.active { color: #f96332; border-bottom-color: #f96332; font-weight: 600; }
+.muestra-color { display: inline-block; width: .8rem; height: .8rem; border-radius: 50%; vertical-align: middle; margin-right: .25rem; }
+
+.pestanas-contenedor .card { box-shadow: none; border: 1px solid #ececec; margin-bottom: 0; }
+.pestanas-admin { flex-direction: row !important; padding-left: 0; margin-bottom: 0; }
+.pestanas-admin .nav-item { width: auto; }
+.pestanas-admin { display: flex !important; }
+.pestanas-admin .nav-item { display: block; width: auto; }
+
+/* Inicio: tarjetas de indicadores y línea de tiempo del historial */
+.tarjeta-kpi .kpi-icono { width: 3rem; height: 3rem; border-radius: 50%; background: #e8f6ff; color: #2CA8FF; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; }
+.tarjeta-kpi .kpi-icono.kpi-alerta { background: #fff1ec; color: #f96332; }
+.tarjeta-kpi .kpi-valor { font-size: 1.8rem; font-weight: 700; line-height: 1.1; }
+.linea-tiempo { list-style: none; margin: 0; padding: 0 0 0 1.75rem; border-left: 2px solid #e3e3e3; }
+.linea-tiempo > li { position: relative; padding: .5rem 0 1rem .5rem; }
+.linea-tiempo-punto { position: absolute; left: -2.55rem; top: .35rem; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: #fff; border: 2px solid #2CA8FF; color: #2CA8FF; display: flex; align-items: center; justify-content: center; font-size: .8rem; }

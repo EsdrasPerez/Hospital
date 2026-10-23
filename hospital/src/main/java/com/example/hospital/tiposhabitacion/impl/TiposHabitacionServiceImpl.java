@@ -1,5 +1,7 @@
 package com.example.hospital.tiposhabitacion.impl;
 
+import com.example.hospital.shared.exception.DuplicadoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.habitacion.HabitacionRepository;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
 import com.example.hospital.tiposhabitacion.TiposHabitacion;
@@ -51,7 +53,7 @@ public class TiposHabitacionServiceImpl implements TiposHabitacionService {
         TiposHabitacion t = new TiposHabitacion();
         t.setDescripcion(dto.descripcion() != null ? dto.descripcion().trim() : null);
         t.setCostoDia(dto.costoDia());
-        t.setActivo(dto.activo());
+        t.setActivo(dto.activo() != null ? dto.activo() : true); // activo por defecto al crear
         return t;
     }
 
@@ -67,10 +69,10 @@ public class TiposHabitacionServiceImpl implements TiposHabitacionService {
 
     private void validarDatos(TiposHabitacionDTO dto, Long idActual) {
         if (dto == null || dto.descripcion() == null || dto.descripcion().trim().isEmpty()) {
-            throw new IllegalArgumentException("La descripción del tipo de habitación es obligatoria");
+            throw new ReglaNegocioException("La descripción del tipo de habitación es obligatoria");
         }
         if (dto.costoDia() == null || dto.costoDia().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("El costo por día debe ser un valor mayor a cero");
+            throw new ReglaNegocioException("El costo por día debe ser un valor mayor a cero");
         }
 
         String canonico = obtenerNombreCanonica(dto.descripcion());
@@ -83,7 +85,7 @@ public class TiposHabitacionServiceImpl implements TiposHabitacionService {
         }
 
         if (existe) {
-            throw new IllegalArgumentException("Ya existe un tipo de habitación con la descripción: " + canonico);
+            throw new DuplicadoException("Ya existe un tipo de habitación con la descripción: " + canonico);
         }
     }
 
@@ -121,7 +123,7 @@ public class TiposHabitacionServiceImpl implements TiposHabitacionService {
     @Transactional
     public TiposHabitacionDTO actualizar(TiposHabitacionDTO dto, Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID del tipo de habitación es obligatorio");
+            throw new ReglaNegocioException("El ID del tipo de habitación es obligatorio");
         }
 
         TiposHabitacion existente = tiposHabitacionRepository.findById(id)
@@ -130,7 +132,7 @@ public class TiposHabitacionServiceImpl implements TiposHabitacionService {
         // Proteger no renombrar los tipos base indispensables
         if (TIPOS_BASE.contains(existente.getDescripcion())) {
             if (dto.descripcion() != null && !dto.descripcion().equalsIgnoreCase(existente.getDescripcion())) {
-                throw new IllegalArgumentException("No se permite renombrar el tipo de habitación base '" +
+                throw new ReglaNegocioException("No se permite renombrar el tipo de habitación base '" +
                         existente.getDescripcion() + "'");
             }
         }
@@ -151,7 +153,7 @@ public class TiposHabitacionServiceImpl implements TiposHabitacionService {
     @Transactional
     public void eliminar(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID del tipo de habitación es obligatorio");
+            throw new ReglaNegocioException("El ID del tipo de habitación es obligatorio");
         }
 
         TiposHabitacion existente = tiposHabitacionRepository.findById(id)
@@ -159,13 +161,13 @@ public class TiposHabitacionServiceImpl implements TiposHabitacionService {
 
         // Proteger no eliminar los tipos base
         if (TIPOS_BASE.contains(existente.getDescripcion())) {
-            throw new IllegalArgumentException("No se permite eliminar el tipo de habitación base '" +
+            throw new ReglaNegocioException("No se permite eliminar el tipo de habitación base '" +
                     existente.getDescripcion() + "'");
         }
 
         // Regla de integridad: no eliminar si existen habitaciones asociadas
         if (habitacionRepository.existsByIdTipoHabitacion(id)) {
-            throw new IllegalStateException("No se puede eliminar el tipo de habitación porque existen habitaciones asociadas a él");
+            throw new DuplicadoException("No se puede eliminar el tipo de habitación porque existen habitaciones asociadas a él");
         }
 
         // Eliminación lógica

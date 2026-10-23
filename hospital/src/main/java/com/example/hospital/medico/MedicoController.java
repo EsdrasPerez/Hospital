@@ -1,5 +1,6 @@
 package com.example.hospital.medico;
 
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -29,17 +30,11 @@ public class MedicoController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO', 'ENFERMERO', 'RECEPCIONISTA')")
-    @Operation(summary = "Listar / buscar médicos", description = "Devuelve los médicos. Filtros opcionales:\n- `criterio`: busca por nombre, apellido o número de colegiado\n- `soloActivos=true`: solo médicos activos\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA.")
+    @Operation(summary = "Listar / buscar médicos", description = "Devuelve los médicos. Filtros opcionales y COMBINABLES:\n- `criterio`: busca por nombre, apellidos o número de colegiado (sin distinguir mayúsculas)\n- `soloActivos=true`: solo médicos activos (por defecto se incluyen también los inactivos)\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA.")
     public List<MedicoDTO> findAll(
             @RequestParam(required = false, defaultValue = "false") boolean soloActivos,
             @RequestParam(required = false) String criterio) {
-        if (criterio != null && !criterio.trim().isEmpty()) {
-            return medicoService.buscar(criterio);
-        }
-        if (soloActivos) {
-            return medicoService.findActivos();
-        }
-        return medicoService.findAll();
+        return medicoService.buscar(criterio, soloActivos);
     }
 
     @GetMapping("/{id}")
@@ -59,7 +54,7 @@ public class MedicoController {
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     @Operation(summary = "Registrar médico", description = "Da de alta a un nuevo médico. El número de colegiado debe ser único.\n\nRoles permitidos: ADMIN.")
-    public ResponseEntity<MedicoDTO> save(@RequestBody MedicoDTO dto) {
+    public ResponseEntity<MedicoDTO> save(@Valid @RequestBody MedicoDTO dto) {
         MedicoDTO creado = medicoService.crear(dto);
         return new ResponseEntity<>(creado, HttpStatus.CREATED);
     }
@@ -69,7 +64,7 @@ public class MedicoController {
     @Operation(summary = "Actualizar médico", description = "Modifica los datos de un médico.\n\nRoles permitidos: ADMIN.")
     public ResponseEntity<MedicoDTO> update(
             @PathVariable Long id,
-            @RequestBody MedicoDTO dto) {
+            @Valid @RequestBody MedicoDTO dto) {
         MedicoDTO actualizado = medicoService.actualizar(dto, id);
         return ResponseEntity.ok(actualizado);
     }

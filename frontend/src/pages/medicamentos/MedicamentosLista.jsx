@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { listarMedicamentos } from '../../api/medicamentos.js'
 import { useAuth } from '../../auth/useAuth.js'
 import Badge, { BadgeActivo } from '../../components/Badge.jsx'
@@ -24,7 +24,9 @@ export default function MedicamentosLista() {
   const puedeEditar = puede(rol, 'medicamentos', 'editar')
 
   const [texto, setTexto] = useState('')
-  const [filtroStock, setFiltroStock] = useState('')
+  const [params] = useSearchParams()
+  // ?stock=alerta (enlace de "Stock bajo" en Inicio): sin stock o por debajo del mínimo
+  const [filtroStock, setFiltroStock] = useState(['sin', 'bajo', 'alerta', 'suficiente'].includes(params.get('stock')) ? params.get('stock') : '')
   const [filtroReceta, setFiltroReceta] = useState('')
   const [incluirInactivos, setIncluirInactivos] = useState(false)
   const [pagina, setPagina] = useState(1)
@@ -38,7 +40,7 @@ export default function MedicamentosLista() {
   }, [texto])
 
   // Filtros enviados al servidor: criterio, bajoStock (sin stock / bajo) y soloActivos
-  const bajoStock = filtroStock === 'sin' || filtroStock === 'bajo'
+  const bajoStock = filtroStock === 'sin' || filtroStock === 'bajo' || filtroStock === 'alerta'
   const soloActivos = !incluirInactivos
   const { datos, error, cargando } = useApi(`medicamentos|${criterio}|${bajoStock}|${soloActivos}`, () =>
     listarMedicamentos({ criterio, bajoStock, soloActivos }),
@@ -51,7 +53,7 @@ export default function MedicamentosLista() {
 
   const filas = useMemo(() => {
     return (datos ?? [])
-      .filter((m) => !filtroStock || estadoStock(m).clave === filtroStock)
+      .filter((m) => !filtroStock || (filtroStock === 'alerta' ? estadoStock(m).clave !== 'suficiente' : estadoStock(m).clave === filtroStock))
       .filter((m) => !filtroReceta || (filtroReceta === 'si' ? m.requiereReceta : !m.requiereReceta))
       .sort((a, b) => a.nombreComercial.localeCompare(b.nombreComercial, 'es'))
   }, [datos, filtroStock, filtroReceta])
@@ -151,6 +153,7 @@ export default function MedicamentosLista() {
           <>
             <select aria-label="Filtrar por stock" className={claseSelect} value={filtroStock} onChange={alCambiar(setFiltroStock)}>
               <option value="">Todo el stock</option>
+              <option value="alerta">Stock bajo o agotado</option>
               <option value="sin">Sin stock</option>
               <option value="bajo">Stock bajo</option>
               <option value="suficiente">Stock suficiente</option>

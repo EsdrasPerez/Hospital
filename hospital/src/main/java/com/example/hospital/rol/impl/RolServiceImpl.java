@@ -1,5 +1,7 @@
 package com.example.hospital.rol.impl;
 
+import java.util.Set;
+import com.example.hospital.usuarios.UsuariosRepository;
 import com.example.hospital.rol.Rol;
 import com.example.hospital.rol.RolRepository;
 import com.example.hospital.rol.RolService;
@@ -16,10 +18,15 @@ import java.util.stream.Collectors;
 @Service
 public class RolServiceImpl implements RolService {
 
-    private final RolRepository rolRepository;
+    /** Roles base del sistema: sus nombres controlan los permisos (ROLE_*), por eso no se renombran. */
+    public static final Set<String> ROLES_BASE = Set.of("ADMIN", "MEDICO", "ENFERMERO", "RECEPCIONISTA", "FARMACEUTICO", "CAJERO");
 
-    public RolServiceImpl(RolRepository rolRepository) {
+    private final RolRepository rolRepository;
+    private final UsuariosRepository usuariosRepository;
+
+    public RolServiceImpl(RolRepository rolRepository, UsuariosRepository usuariosRepository) {
         this.rolRepository = rolRepository;
+        this.usuariosRepository = usuariosRepository;
     }
 
     private RolDTO mapToDTO(Rol e) {
@@ -78,8 +85,14 @@ public class RolServiceImpl implements RolService {
     public RolDTO actualizar(RolDTO dto, Long id) {
         Rol existente = buscar(id);
         validar(dto, id);
+        // Los 6 roles base no se renombran: romperían la autorización por nombre de rol
+        if (esBase(existente.getNombre()) && !existente.getNombre().equalsIgnoreCase(dto.nombre().trim())) {
+            throw new ReglaNegocioException("No se puede cambiar el nombre del rol base '" + existente.getNombre() + "'");
+        }
         Rol entity = existente;
-        entity.setNombre(dto.nombre().trim());
+        if (!esBase(existente.getNombre())) {
+            entity.setNombre(dto.nombre().trim()); // los roles base conservan su nombre exacto
+        }
         entity.setDescripcion(dto.descripcion());
         if (dto.activo() != null) {
             entity.setActivo(dto.activo());
@@ -91,9 +104,17 @@ public class RolServiceImpl implements RolService {
     @Transactional
     public void eliminar(Long id) {
         Rol existente = buscar(id);
+        // Conflicto con dependencias: usuarios activos con este rol
+        if (usuariosRepository.existsByIdRolAndEstadoTrue(id)) {
+            throw new DuplicadoException("No se puede eliminar el rol porque hay usuarios activos con ese rol");
+        }
         // Eliminación lógica para conservar el historial
         existente.setActivo(false);
         rolRepository.save(existente);
+    }
+
+    private boolean esBase(String nombre) {
+        return nombre != null && ROLES_BASE.contains(nombre.trim().toUpperCase());
     }
 
     private Rol buscar(Long id) {

@@ -32,6 +32,8 @@ export const MODULOS = [
       crear: [ADMIN, RECEPCIONISTA],
       editar: [ADMIN, RECEPCIONISTA],
       desactivar: [ADMIN],
+      // GET /api/reportes/paciente/{id}/historial
+      historial: [ADMIN, MEDICO, ENFERMERO],
     },
   },
   {
@@ -239,8 +241,9 @@ export const MODULOS = [
     titulo: 'Personal médico',
     ruta: '/personal',
     grupo: 'Administración',
-    implementado: false,
-    // /api/medico, /api/turnos: CLINICOS; /api/enfermeros: TODOS. Escritura: solo ADMIN.
+    implementado: true,
+    // /api/medico y /api/turnos: lectura CLINICOS; enfermeros, departamentos, clínicas y especialidades: lectura abierta.
+    // Escritura (crear, editar, desactivar, asignar especialidades): solo ADMIN.
     permisos: { ver: CLINICOS, crear: SOLO_ADMIN, editar: SOLO_ADMIN, desactivar: SOLO_ADMIN },
   },
   {
@@ -249,10 +252,11 @@ export const MODULOS = [
     titulo: 'Catálogos',
     ruta: '/catalogos',
     grupo: 'Administración',
-    implementado: false,
-    // Clínicas, departamentos, especialidades, tipos y estados: lectura TODOS, escritura ADMIN.
-    // Alergias: lectura CLINICOS, escritura ADMIN/MEDICO.
-    permisos: { ver: TODOS, crear: SOLO_ADMIN, editar: SOLO_ADMIN, desactivar: SOLO_ADMIN },
+    implementado: true,
+    // Catálogos (tipos, estados, niveles de urgencia, métodos de pago): lectura casi abierta, escritura ADMIN.
+    // Alergias: escritura ADMIN/MEDICO (desactivar solo ADMIN). La pantalla ofrece a cada rol solo los catálogos que puede
+    // modificar (ver `escribir` en config/catalogos.js); por eso `ver` es ADMIN y MEDICO.
+    permisos: { ver: [ADMIN, MEDICO], crear: SOLO_ADMIN, editar: SOLO_ADMIN, desactivar: SOLO_ADMIN },
   },
   {
     clave: 'usuarios',
@@ -260,7 +264,7 @@ export const MODULOS = [
     titulo: 'Usuarios y roles',
     ruta: '/usuarios',
     grupo: 'Administración',
-    implementado: false,
+    implementado: true,
     permisos: { ver: SOLO_ADMIN, crear: SOLO_ADMIN, editar: SOLO_ADMIN, desactivar: SOLO_ADMIN },
   },
 ]

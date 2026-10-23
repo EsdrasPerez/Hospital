@@ -27,7 +27,8 @@ export default function FacturasLista() {
   const [texto, setTexto] = useState('')
   const [idPaciente, setIdPaciente] = useState(params.get('idPaciente') ?? '')
   const idHospitalizacion = params.get('idHospitalizacion') ?? ''
-  const [estado, setEstado] = useState('')
+  // ?estado=<idEstadoFactura> (enlace de "Facturas pendientes" en Inicio)
+  const [estado, setEstado] = useState(/^\d+$/.test(params.get('estado') ?? '') ? params.get('estado') : '')
   const [desde, setDesde] = useState('')
   const [hasta, setHasta] = useState('')
   const [incluirAnuladas, setIncluirAnuladas] = useState(false)

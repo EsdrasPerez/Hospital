@@ -11,6 +11,8 @@ public interface PagosRepository extends JpaRepository<Pagos, Long> {
     // Validar si existen pagos asociados a una cuenta
     boolean existsByIdCuenta(Long idCuenta);
 
+    boolean existsByIdMetodoPago(Long idMetodoPago);
+
     List<Pagos> findByIdCuenta(Long idCuenta);
 
     List<Pagos> findByIdFactura(Long idFactura);
