@@ -16,5 +16,9 @@ public interface EstadoHabitacionRepository extends JpaRepository<EstadoHabitaci
 
     Optional<EstadoHabitacion> findByDescripcionIgnoreCase(String descripcion);
 
+    boolean existsByNombreIgnoreCase(String nombre);
+
+    boolean existsByNombreIgnoreCaseAndIdEstadoHabitacionNot(String nombre, Long idEstadoHabitacion);
+
     List<EstadoHabitacion> findByActivoTrue();
 }

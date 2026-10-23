@@ -1,6 +1,8 @@
 package com.example.hospital.habitacion.impl;
 
 import com.example.hospital.emergencia.EmergenciaRepository;
+import com.example.hospital.shared.catalogos.EstadosCatalogo;
+import com.example.hospital.shared.exception.DuplicadoException;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
 import com.example.hospital.estadohabitacion.EstadoHabitacion;
 import com.example.hospital.estadohabitacion.EstadoHabitacionRepository;
@@ -21,25 +23,26 @@ import java.util.stream.Collectors;
 @Service
 public class HabitacionServiceImpl implements HabitacionService {
 
-    public static final Long ESTADO_HAB_DISPONIBLE = 1L;
-    public static final Long ESTADO_HOSP_ACTIVA = 1L;
-
     private final HabitacionRepository habitacionRepository;
     private final EstadoHabitacionRepository estadoHabitacionRepository;
     private final TiposHabitacionRepository tiposHabitacionRepository;
     private final HospitalizacionesRepository hospitalizacionesRepository;
     private final EmergenciaRepository emergenciaRepository;
+    // Los estados (Disponible, Ocupada, Mantenimiento, Activa) se resuelven por nombre, no por id fijo
+    private final EstadosCatalogo estados;
 
     public HabitacionServiceImpl(HabitacionRepository habitacionRepository,
                                  EstadoHabitacionRepository estadoHabitacionRepository,
                                  TiposHabitacionRepository tiposHabitacionRepository,
                                  HospitalizacionesRepository hospitalizacionesRepository,
-                                 EmergenciaRepository emergenciaRepository) {
+                                 EmergenciaRepository emergenciaRepository,
+                                 EstadosCatalogo estados) {
         this.habitacionRepository = habitacionRepository;
         this.estadoHabitacionRepository = estadoHabitacionRepository;
         this.tiposHabitacionRepository = tiposHabitacionRepository;
         this.hospitalizacionesRepository = hospitalizacionesRepository;
         this.emergenciaRepository = emergenciaRepository;
+        this.estados = estados;
     }
 
     private HabitacionDTO mapToDTO(Habitacion h) {
@@ -74,6 +77,23 @@ public class HabitacionServiceImpl implements HabitacionService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<HabitacionDTO> buscar(Integer piso, Long idTipoHabitacion, Long idEstadoHabitacion,
+                                      boolean soloActivas, boolean soloDisponibles) {
+        Long disponible = soloDisponibles ? estados.habDisponible() : null;
+        return habitacionRepository.findAll()
+                .stream()
+                .filter(h -> piso == null || piso.equals(h.getPiso()))
+                .filter(h -> idTipoHabitacion == null || idTipoHabitacion.equals(h.getIdTipoHabitacion()))
+                .filter(h -> idEstadoHabitacion == null || idEstadoHabitacion.equals(h.getIdEstadoHabitacion()))
+                // soloDisponibles implica habitaciones activas en estado Disponible
+                .filter(h -> !(soloActivas || soloDisponibles) || Boolean.TRUE.equals(h.getActivo()))
+                .filter(h -> disponible == null || disponible.equals(h.getIdEstadoHabitacion()))
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public HabitacionDTO findById(Long id) {
         Habitacion entity = habitacionRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe la habitación con ID: " + id));
@@ -94,7 +114,7 @@ public class HabitacionServiceImpl implements HabitacionService {
     @Override
     @Transactional(readOnly = true)
     public List<HabitacionDTO> findDisponibles() {
-        return habitacionRepository.findByIdEstadoHabitacionAndActivoTrue(ESTADO_HAB_DISPONIBLE)
+        return habitacionRepository.findByIdEstadoHabitacionAndActivoTrue(estados.habDisponible())
                 .stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
@@ -104,6 +124,8 @@ public class HabitacionServiceImpl implements HabitacionService {
     @Transactional
     public HabitacionDTO crear(HabitacionDTO dto) {
         validarReglasDeNegocio(dto, null);
+        // Una habitación nueva no tiene pacientes: no puede nacer Ocupada (ni, por tanto, requerir otras reglas)
+        validarCambioDeEstado(null, dto.idEstadoHabitacion(), dto.capacidad());
 
         Habitacion entity = new Habitacion();
         entity.setNumero(dto.numero().trim());
@@ -128,6 +150,11 @@ public class HabitacionServiceImpl implements HabitacionService {
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe la habitación con ID: " + id));
 
         validarReglasDeNegocio(dto, id);
+        // Si cambia el estado (o la capacidad), se aplican las mismas reglas que en PATCH /estado
+        if (!dto.idEstadoHabitacion().equals(existente.getIdEstadoHabitacion())
+                || !dto.capacidad().equals(existente.getCapacidad())) {
+            validarCambioDeEstado(id, dto.idEstadoHabitacion(), dto.capacidad());
+        }
 
         existente.setNumero(dto.numero().trim());
         existente.setPiso(dto.piso());
@@ -154,14 +181,40 @@ public class HabitacionServiceImpl implements HabitacionService {
 
         EstadoHabitacion estado = estadoHabitacionRepository.findById(nuevoEstadoId)
                 .orElseThrow(() -> new ReglaNegocioException("El estado de habitación con ID " + nuevoEstadoId + " no existe"));
-
         if (!Boolean.TRUE.equals(estado.getActivo())) {
             throw new ReglaNegocioException("El estado de habitación seleccionado se encuentra inactivo");
         }
 
+        validarCambioDeEstado(id, nuevoEstadoId, existente.getCapacidad());
+
         existente.setIdEstadoHabitacion(nuevoEstadoId);
         Habitacion guardada = habitacionRepository.save(existente);
         return mapToDTO(guardada);
+    }
+
+    /**
+     * Reglas del estado según la ocupación real (hospitalizaciones Activas en la habitación):
+     * - Disponible: no si la habitación está llena (ocupación >= capacidad).
+     * - Ocupada: no si no hay pacientes (ocupación = 0).
+     * - Mantenimiento: no si hay pacientes (ocupación > 0).
+     *
+     * @param idHabitacion null al crear (ocupación 0)
+     */
+    private void validarCambioDeEstado(Long idHabitacion, Long nuevoEstadoId, Integer capacidad) {
+        long ocupacion = idHabitacion == null
+                ? 0
+                : hospitalizacionesRepository.countByIdHabitacionAndIdEstadoHosp(idHabitacion, estados.hospActiva());
+        int cap = capacidad != null ? capacidad : 1;
+
+        if (nuevoEstadoId.equals(estados.habDisponible()) && ocupacion >= cap) {
+            throw new ReglaNegocioException("No se puede marcar como Disponible una habitación llena (" + ocupacion + " de " + cap + " camas ocupadas)");
+        }
+        if (nuevoEstadoId.equals(estados.habOcupada()) && ocupacion == 0) {
+            throw new ReglaNegocioException("No se puede marcar como Ocupada una habitación sin pacientes hospitalizados");
+        }
+        if (nuevoEstadoId.equals(estados.habMantenimiento()) && ocupacion > 0) {
+            throw new ReglaNegocioException("No se puede pasar a Mantenimiento una habitación con pacientes hospitalizados (" + ocupacion + ")");
+        }
     }
 
     @Override
@@ -175,11 +228,10 @@ public class HabitacionServiceImpl implements HabitacionService {
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe la habitación con ID: " + id));
 
         // RN-HAB-06: Integridad clínica antes de desactivar
-        long hospitalizados = hospitalizacionesRepository.countByIdHabitacionAndIdEstadoHosp(id, ESTADO_HOSP_ACTIVA);
+        long hospitalizados = hospitalizacionesRepository.countByIdHabitacionAndIdEstadoHosp(id, estados.hospActiva());
         if (hospitalizados > 0) {
             throw new ReglaNegocioException("No se puede desactivar la habitación porque tiene pacientes actualmente hospitalizados en ella.");
         }
-
         if (!emergenciaRepository.findByIdHabitacionAndActivoTrue(id).isEmpty()) {
             throw new ReglaNegocioException("No se puede desactivar la habitación porque tiene ingresos de emergencia activos asignados.");
         }
@@ -189,40 +241,28 @@ public class HabitacionServiceImpl implements HabitacionService {
         habitacionRepository.save(existente);
     }
 
+    /**
+     * Número, piso, capacidad (> 0), tipo y estado obligatorios: Bean Validation en HabitacionDTO
+     * (400 con detalles). Aquí quedan las reglas de negocio: número único (409) y tipo/estado existentes y activos (422).
+     */
     private void validarReglasDeNegocio(HabitacionDTO dto, Long idActualizacion) {
         if (dto == null) {
             throw new ReglaNegocioException("Los datos de la habitación son requeridos");
         }
 
-        // RN-HAB-01: Número obligatorio y único
-        if (dto.numero() == null || dto.numero().trim().isEmpty()) {
-            throw new ReglaNegocioException("El número de habitación es obligatorio");
-        }
+        // RN-HAB-01: Número único
         String num = dto.numero().trim();
         if (idActualizacion == null) {
             if (habitacionRepository.existsByNumero(num)) {
-                throw new ReglaNegocioException("Ya existe una habitación registrada con el número: " + num);
+                throw new DuplicadoException("Ya existe una habitación registrada con el número: " + num);
             }
         } else {
             if (habitacionRepository.existsByNumeroAndIdHabitacionNot(num, idActualizacion)) {
-                throw new ReglaNegocioException("Ya existe otra habitación registrada con el número: " + num);
+                throw new DuplicadoException("Ya existe otra habitación registrada con el número: " + num);
             }
         }
 
-        // RN-HAB-02: Piso obligatorio
-        if (dto.piso() == null) {
-            throw new ReglaNegocioException("El piso donde se ubica la habitación es obligatorio");
-        }
-
-        // RN-HAB-03: Capacidad mayor que cero
-        if (dto.capacidad() == null || dto.capacidad() <= 0) {
-            throw new ReglaNegocioException("La capacidad de la habitación debe ser mayor que cero");
-        }
-
         // RN-HAB-04: Tipo de habitación existente y activo
-        if (dto.idTipoHabitacion() == null) {
-            throw new ReglaNegocioException("El tipo de habitación es obligatorio");
-        }
         TiposHabitacion tipo = tiposHabitacionRepository.findById(dto.idTipoHabitacion())
                 .orElseThrow(() -> new ReglaNegocioException("El tipo de habitación con ID " + dto.idTipoHabitacion() + " no existe"));
         if (!Boolean.TRUE.equals(tipo.getActivo())) {
@@ -230,9 +270,6 @@ public class HabitacionServiceImpl implements HabitacionService {
         }
 
         // RN-HAB-05: Estado de habitación existente y activo
-        if (dto.idEstadoHabitacion() == null) {
-            throw new ReglaNegocioException("El estado de la habitación es obligatorio");
-        }
         EstadoHabitacion estado = estadoHabitacionRepository.findById(dto.idEstadoHabitacion())
                 .orElseThrow(() -> new ReglaNegocioException("El estado de habitación con ID " + dto.idEstadoHabitacion() + " no existe"));
         if (!Boolean.TRUE.equals(estado.getActivo())) {

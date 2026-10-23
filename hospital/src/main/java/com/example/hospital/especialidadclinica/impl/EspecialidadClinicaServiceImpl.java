@@ -1,5 +1,7 @@
 package com.example.hospital.especialidadclinica.impl;
 
+import com.example.hospital.shared.exception.DuplicadoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.clinicas.ClinicasRepository;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
 import com.example.hospital.especialidadclinica.EspecialidadClinica;
@@ -37,18 +39,18 @@ public class EspecialidadClinicaServiceImpl implements EspecialidadClinicaServic
         EspecialidadClinica e = new EspecialidadClinica();
         e.setNombre(dto.nombre() != null ? dto.nombre().trim() : null);
         e.setDescripcion(dto.descripcion() != null ? dto.descripcion().trim() : null);
-        e.setActivo(dto.activo());
+        e.setActivo(dto.activo() != null ? dto.activo() : true); // activo por defecto al crear
         return e;
     }
 
     private void validarDatos(EspecialidadClinicaDTO dto, Long idActual) {
         if (dto == null) {
-            throw new IllegalArgumentException("Los datos de la especialidad clínica no pueden ser nulos");
+            throw new ReglaNegocioException("Los datos de la especialidad clínica no pueden ser nulos");
         }
 
         // Nombre obligatorio
         if (dto.nombre() == null || dto.nombre().trim().isEmpty()) {
-            throw new IllegalArgumentException("El nombre de la especialidad clínica es obligatorio");
+            throw new ReglaNegocioException("El nombre de la especialidad clínica es obligatorio");
         }
 
         String nombreLimpio = dto.nombre().trim();
@@ -60,7 +62,7 @@ public class EspecialidadClinicaServiceImpl implements EspecialidadClinicaServic
         }
 
         if (duplicado) {
-            throw new IllegalArgumentException("Ya existe una especialidad clínica con el nombre: " + nombreLimpio);
+            throw new DuplicadoException("Ya existe una especialidad clínica con el nombre: " + nombreLimpio);
         }
     }
 
@@ -105,7 +107,7 @@ public class EspecialidadClinicaServiceImpl implements EspecialidadClinicaServic
     @Transactional
     public EspecialidadClinicaDTO actualizar(EspecialidadClinicaDTO dto, Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID de la especialidad clínica es obligatorio");
+            throw new ReglaNegocioException("El ID de la especialidad clínica es obligatorio");
         }
 
         EspecialidadClinica existente = especialidadClinicaRepository.findById(id)
@@ -127,11 +129,16 @@ public class EspecialidadClinicaServiceImpl implements EspecialidadClinicaServic
     @Transactional
     public void eliminar(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID de la especialidad clínica es obligatorio");
+            throw new ReglaNegocioException("El ID de la especialidad clínica es obligatorio");
         }
 
         EspecialidadClinica existente = especialidadClinicaRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe la especialidad clínica con ID: " + id));
+
+        // Conflicto con dependencias: clínicas activas que usan la especialidad
+        if (clinicasRepository.existsByIdEspecialidadAndEstadoClinicaTrue(id)) {
+            throw new DuplicadoException("No se puede eliminar la especialidad porque la usan clínicas activas");
+        }
 
         // Borrado lógico
         existente.setActivo(false);

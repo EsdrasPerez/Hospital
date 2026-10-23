@@ -17,5 +17,6 @@ public interface AsignacionEnfermerosService {
 
     List<AsignacionEnfermerosDTO> findByEnfermero(Long idEnfermero);
 
-    List<AsignacionEnfermerosDTO> findByHospitalizacion(Long idHospitalizacion);
+    /** Con soloActivas=true se omiten las asignaciones quitadas (activo = false). */
+    List<AsignacionEnfermerosDTO> findByHospitalizacion(Long idHospitalizacion, boolean soloActivas);
 }

@@ -12,6 +12,9 @@ public interface TratamientoService {
 
     TratamientoDTO findById(Long id);
 
+    /** Filtros opcionales y combinables; sin soloActivos devuelve también los inactivos (igual que el listado general). */
+    List<TratamientoDTO> buscar(Long idDiagnostico, boolean soloActivos);
+
     List<TratamientoDTO> findByDiagnostico(Long idDiagnostico);
 
     TratamientoDTO crear(TratamientoDTO dto);

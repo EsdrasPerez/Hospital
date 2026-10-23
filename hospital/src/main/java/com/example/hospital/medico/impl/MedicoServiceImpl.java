@@ -1,5 +1,7 @@
 package com.example.hospital.medico.impl;
 
+import com.example.hospital.shared.catalogos.EstadosCatalogo;
+import com.example.hospital.shared.exception.DuplicadoException;
 import com.example.hospital.citas.CitasRepository;
 import com.example.hospital.emergencia.Emergencia;
 import com.example.hospital.emergencia.EmergenciaRepository;
@@ -19,22 +21,25 @@ import java.util.stream.Collectors;
 @Service
 public class MedicoServiceImpl implements MedicoService {
 
-    public static final Long ESTADO_HOSP_ACTIVA = 1L;
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
     private final MedicoRepository medicoRepository;
     private final CitasRepository citasRepository;
     private final HospitalizacionesRepository hospitalizacionesRepository;
     private final EmergenciaRepository emergenciaRepository;
+    // El estado de hospitalización Activa se resuelve por nombre, no por id fijo
+    private final EstadosCatalogo estados;
 
     public MedicoServiceImpl(MedicoRepository medicoRepository,
                              CitasRepository citasRepository,
                              HospitalizacionesRepository hospitalizacionesRepository,
-                             EmergenciaRepository emergenciaRepository) {
+                             EmergenciaRepository emergenciaRepository,
+                             EstadosCatalogo estados) {
         this.medicoRepository = medicoRepository;
         this.citasRepository = citasRepository;
         this.hospitalizacionesRepository = hospitalizacionesRepository;
         this.emergenciaRepository = emergenciaRepository;
+        this.estados = estados;
     }
 
     private MedicoDTO mapToDTO(Medico m) {
@@ -99,6 +104,23 @@ public class MedicoServiceImpl implements MedicoService {
                 .filter(m -> Boolean.TRUE.equals(m.getEstado()))
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MedicoDTO> buscar(String criterio, boolean soloActivos) {
+        String q = criterio == null ? "" : criterio.trim().toLowerCase();
+        return medicoRepository.findAll().stream()
+                .filter(m -> !soloActivos || Boolean.TRUE.equals(m.getEstado()))
+                .filter(m -> q.isEmpty()
+                        || contiene(m.getNombre(), q) || contiene(m.getApellidoPaterno(), q)
+                        || contiene(m.getApellidoMaterno(), q) || contiene(m.getNoColegiado(), q))
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    private boolean contiene(String texto, String q) {
+        return texto != null && texto.toLowerCase().contains(q);
     }
 
     @Override
@@ -207,11 +229,11 @@ public class MedicoServiceImpl implements MedicoService {
 
         if (idActual == null) {
             if (medicoRepository.existsByNoColegiado(colegiado)) {
-                throw new ReglaNegocioException("Ya existe un médico registrado con el número de colegiado: " + colegiado);
+                throw new DuplicadoException("Ya existe un médico registrado con el número de colegiado: " + colegiado);
             }
         } else {
             if (medicoRepository.existsByNoColegiadoAndIdMedicoNot(colegiado, idActual)) {
-                throw new ReglaNegocioException("Ya existe otro médico registrado con el número de colegiado: " + colegiado);
+                throw new DuplicadoException("Ya existe otro médico registrado con el número de colegiado: " + colegiado);
             }
         }
 
@@ -231,11 +253,11 @@ public class MedicoServiceImpl implements MedicoService {
             }
             if (idActual == null) {
                 if (medicoRepository.existsByEmailIgnoreCase(email)) {
-                    throw new ReglaNegocioException("Ya existe un médico registrado con el correo electrónico: " + email);
+                    throw new DuplicadoException("Ya existe un médico registrado con el correo electrónico: " + email);
                 }
             } else {
                 if (medicoRepository.existsByEmailIgnoreCaseAndIdMedicoNot(email, idActual)) {
-                    throw new ReglaNegocioException("Ya existe otro médico registrado con el correo electrónico: " + email);
+                    throw new DuplicadoException("Ya existe otro médico registrado con el correo electrónico: " + email);
                 }
             }
         }
@@ -256,7 +278,7 @@ public class MedicoServiceImpl implements MedicoService {
         }
 
         // Hospitalizaciones activas
-        if (hospitalizacionesRepository.existsByIdMedicoResponsableAndIdEstadoHosp(idMedico, ESTADO_HOSP_ACTIVA)) {
+        if (hospitalizacionesRepository.existsByIdMedicoResponsableAndIdEstadoHosp(idMedico, estados.hospActiva())) {
             throw new ReglaNegocioException("No se puede desactivar o eliminar el médico porque tiene hospitalizaciones activas a su cargo.");
         }
 

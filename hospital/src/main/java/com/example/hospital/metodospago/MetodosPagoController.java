@@ -1,5 +1,6 @@
 package com.example.hospital.metodospago;
 
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -44,14 +45,14 @@ public class MetodosPagoController {
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     @Operation(summary = "Registrar método de pago", description = "Agrega un nuevo método de pago al catálogo.\n\nRoles permitidos: ADMIN.")
-    public ResponseEntity<MetodosPagoDTO> crear(@RequestBody MetodosPagoDTO dto) {
+    public ResponseEntity<MetodosPagoDTO> crear(@Valid @RequestBody MetodosPagoDTO dto) {
         return new ResponseEntity<>(metodosPagoService.crear(dto), HttpStatus.CREATED);
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar método de pago", description = "Modifica un método de pago.\n\nRoles permitidos: ADMIN.")
-    public ResponseEntity<MetodosPagoDTO> actualizar(@PathVariable Long id, @RequestBody MetodosPagoDTO dto) {
+    public ResponseEntity<MetodosPagoDTO> actualizar(@PathVariable Long id, @Valid @RequestBody MetodosPagoDTO dto) {
         return ResponseEntity.ok(metodosPagoService.actualizar(dto, id));
     }
 

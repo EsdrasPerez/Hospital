@@ -1,5 +1,6 @@
 package com.example.hospital.reportes;
 
+import org.springframework.security.core.Authentication;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -33,8 +34,12 @@ public class ReportesController {
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO', 'ENFERMERO')")
     @GetMapping("/paciente/{idPaciente}/historial")
-    @Operation(summary = "Historial completo de un paciente", description = "**Nuevo.** Devuelve el expediente consolidado de un paciente: datos generales, citas, hospitalizaciones, ingresos a emergencia, cuentas y facturas. Evita que el frontend tenga que hacer 6 llamadas. Responde 404 si el paciente no existe o está inactivo.\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO.")
-    public HistorialPacienteDTO historialPaciente(@PathVariable Long idPaciente) {
-        return reportesService.historialPaciente(idPaciente);
+    @Operation(summary = "Historial completo de un paciente", description = "Devuelve el expediente consolidado de un paciente: datos generales, citas, consultas de esas citas, diagnósticos asociados, tratamientos (y sus medicamentos), hospitalizaciones, ingresos a emergencia y, solo para ADMIN o CAJERO, cuentas y facturas.\n\n- `incluirAnulados` (por defecto `false`): incluye también los registros anulados (`activo=false`) en TODAS las secciones; sin él, todas se filtran con el mismo criterio.\n- Minimización de datos: para MEDICO y ENFERMERO las listas `cuentas` y `facturas` vienen vacías y `incluyeDatosFinancieros` es `false`.\n- Es un histórico: un paciente inactivo también devuelve su historial (`paciente.activo=false`). Responde 404 solo si el paciente no existe.\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO.")
+    public HistorialPacienteDTO historialPaciente(@PathVariable Long idPaciente,
+                                                  @RequestParam(required = false, defaultValue = "false") boolean incluirAnulados,
+                                                  Authentication authentication) {
+        boolean finanzas = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()) || "ROLE_CAJERO".equals(a.getAuthority()));
+        return reportesService.historialPaciente(idPaciente, incluirAnulados, finanzas);
     }
 }

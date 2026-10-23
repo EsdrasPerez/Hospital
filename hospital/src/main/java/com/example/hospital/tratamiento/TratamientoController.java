@@ -1,6 +1,7 @@
 package com.example.hospital.tratamiento;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,13 +33,7 @@ public class TratamientoController {
     public List<TratamientoDTO> findAll(
             @RequestParam(required = false, defaultValue = "false") boolean soloActivos,
             @RequestParam(required = false) Long idDiagnostico) {
-        if (idDiagnostico != null) {
-            return tratamientoService.findByDiagnostico(idDiagnostico);
-        }
-        if (soloActivos) {
-            return tratamientoService.findActivos();
-        }
-        return tratamientoService.findAll();
+        return tratamientoService.buscar(idDiagnostico, soloActivos);
     }
 
     @GetMapping("/{id}")
@@ -50,7 +45,7 @@ public class TratamientoController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO')")
     @PostMapping
     @Operation(summary = "Registrar tratamiento", description = "Registra un tratamiento para un diagnóstico.\n\nRoles permitidos: ADMIN, MEDICO.")
-    public ResponseEntity<TratamientoDTO> save(@RequestBody TratamientoDTO dto) {
+    public ResponseEntity<TratamientoDTO> save(@Valid @RequestBody TratamientoDTO dto) {
         TratamientoDTO creado = tratamientoService.crear(dto);
         return new ResponseEntity<>(creado, HttpStatus.CREATED);
     }
@@ -60,7 +55,7 @@ public class TratamientoController {
     @Operation(summary = "Actualizar tratamiento", description = "Modifica un tratamiento.\n\nRoles permitidos: ADMIN, MEDICO.")
     public ResponseEntity<TratamientoDTO> update(
             @PathVariable Long id,
-            @RequestBody TratamientoDTO dto) {
+            @Valid @RequestBody TratamientoDTO dto) {
         TratamientoDTO actualizado = tratamientoService.actualizar(dto, id);
         return ResponseEntity.ok(actualizado);
     }

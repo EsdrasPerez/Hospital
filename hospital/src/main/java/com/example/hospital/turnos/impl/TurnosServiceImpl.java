@@ -1,5 +1,7 @@
 package com.example.hospital.turnos.impl;
 
+import com.example.hospital.shared.exception.DuplicadoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.asignacionenfermeros.AsignacionEnfermerosRepository;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
 import com.example.hospital.turnos.Turnos;
@@ -42,7 +44,7 @@ public class TurnosServiceImpl implements TurnosService {
         t.setDescripcion(dto.descripcion() != null ? dto.descripcion().trim() : null);
         t.setHoraInicio(dto.horaInicio());
         t.setHoraFin(dto.horaFin());
-        t.setActivo(dto.activo());
+        t.setActivo(dto.activo() != null ? dto.activo() : true); // activo por defecto al crear
         return t;
     }
 
@@ -73,12 +75,12 @@ public class TurnosServiceImpl implements TurnosService {
      */
     private void validarHorariosYDescripcion(TurnosDTO dto, Long idTurnoActual) {
         if (dto == null) {
-            throw new IllegalArgumentException("Los datos del turno son obligatorios");
+            throw new ReglaNegocioException("Los datos del turno son obligatorios");
         }
 
         // RN-01: Todo turno debe tener una descripción. No permitir nulos, vacíos o espacios
         if (dto.descripcion() == null || dto.descripcion().trim().isEmpty()) {
-            throw new IllegalArgumentException("La descripción del turno es obligatoria y no puede estar vacía");
+            throw new ReglaNegocioException("La descripción del turno es obligatoria y no puede estar vacía");
         }
 
         String descripcionLimpia = dto.descripcion().trim();
@@ -92,20 +94,20 @@ public class TurnosServiceImpl implements TurnosService {
         }
 
         if (duplicadoDescripcion) {
-            throw new IllegalArgumentException("Ya existe un turno con la descripción: " + descripcionLimpia);
+            throw new DuplicadoException("Ya existe un turno con la descripción: " + descripcionLimpia);
         }
 
         // RN-03: Todo turno debe tener horaInicio y horaFin obligatorios
         if (dto.horaInicio() == null) {
-            throw new IllegalArgumentException("La hora de inicio es obligatoria");
+            throw new ReglaNegocioException("La hora de inicio es obligatoria");
         }
         if (dto.horaFin() == null) {
-            throw new IllegalArgumentException("La hora de finalización es obligatoria");
+            throw new ReglaNegocioException("La hora de finalización es obligatoria");
         }
 
         // RN-04: La hora de inicio y finalización no pueden ser iguales
         if (dto.horaInicio().equals(dto.horaFin())) {
-            throw new IllegalArgumentException("La hora de inicio y la hora de finalización no pueden ser iguales");
+            throw new ReglaNegocioException("La hora de inicio y la hora de finalización no pueden ser iguales");
         }
 
         // RN-05 y RN-06: Duración mayor a cero. Si horaFin < horaInicio, contempla cruce de medianoche (turno nocturno)
@@ -119,7 +121,7 @@ public class TurnosServiceImpl implements TurnosService {
         }
 
         if (duracionMinutos <= 0) {
-            throw new IllegalArgumentException("La duración del turno debe ser mayor a cero");
+            throw new ReglaNegocioException("La duración del turno debe ser mayor a cero");
         }
 
         // RN-07: No permitir turnos con horarios superpuestos con turnos activos existentes
@@ -133,7 +135,7 @@ public class TurnosServiceImpl implements TurnosService {
             }
 
             if (seSuperponen(dto.horaInicio(), dto.horaFin(), t.getHoraInicio(), t.getHoraFin())) {
-                throw new IllegalArgumentException("El horario (" + dto.horaInicio() + " - " + dto.horaFin() +
+                throw new ReglaNegocioException("El horario (" + dto.horaInicio() + " - " + dto.horaFin() +
                         ") se superpone con el turno existente '" + t.getDescripcion() + "' (" +
                         t.getHoraInicio() + " - " + t.getHoraFin() + ")");
             }
@@ -174,7 +176,7 @@ public class TurnosServiceImpl implements TurnosService {
     public TurnosDTO actualizar(TurnosDTO dto, Long id) {
         // RN-08: Solo se podrán modificar turnos existentes
         if (id == null) {
-            throw new IllegalArgumentException("El ID del turno es obligatorio");
+            throw new ReglaNegocioException("El ID del turno es obligatorio");
         }
 
         Turnos existente = turnosRepository.findById(id)
@@ -189,7 +191,7 @@ public class TurnosServiceImpl implements TurnosService {
             boolean tieneAsignacionesFuturas = asignacionEnfermerosRepository
                     .existsByIdTurnoAndFechaAsignacionGreaterThanEqual(id, LocalDate.now());
             if (tieneAsignacionesFuturas) {
-                throw new IllegalArgumentException("No se pueden modificar los horarios del turno porque tiene asignaciones de enfermeros vigentes o futuras asociadas");
+                throw new DuplicadoException("No se pueden modificar los horarios del turno porque tiene asignaciones de enfermeros vigentes o futuras asociadas");
             }
         }
 
@@ -208,7 +210,7 @@ public class TurnosServiceImpl implements TurnosService {
     @Transactional
     public void eliminar(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID del turno es obligatorio");
+            throw new ReglaNegocioException("El ID del turno es obligatorio");
         }
 
         Turnos existente = turnosRepository.findById(id)

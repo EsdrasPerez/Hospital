@@ -1,5 +1,7 @@
 package com.example.hospital.estadohabitacion.impl;
 
+import com.example.hospital.shared.exception.DuplicadoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.estadohabitacion.EstadoHabitacion;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
 import com.example.hospital.estadohabitacion.EstadoHabitacionRepository;
@@ -47,7 +49,7 @@ public class EstadoHabitacionServiceImpl implements EstadoHabitacionService {
         EstadoHabitacion e = new EstadoHabitacion();
         e.setNombre(dto.nombre());
         e.setDescripcion(dto.descripcion() != null ? dto.descripcion().trim() : null);
-        e.setActivo(dto.activo());
+        e.setActivo(dto.activo() != null ? dto.activo() : true); // activo por defecto al crear
         return e;
     }
 
@@ -59,6 +61,21 @@ public class EstadoHabitacionServiceImpl implements EstadoHabitacionService {
             }
         }
         return descripcion.trim();
+    }
+
+    /** Nombre efectivo: el enviado o, si falta, la descripción; máximo 30 caracteres y único (409 si se repite). */
+    private String validarNombre(String nombre, String descripcion, Long idActual) {
+        String efectivo = nombre == null || nombre.isBlank() ? descripcion : nombre.trim();
+        if (efectivo == null || efectivo.length() > 30) {
+            throw new ReglaNegocioException("El nombre del estado no puede superar los 30 caracteres");
+        }
+        boolean duplicado = idActual == null
+                ? estadoHabitacionRepository.existsByNombreIgnoreCase(efectivo)
+                : estadoHabitacionRepository.existsByNombreIgnoreCaseAndIdEstadoHabitacionNot(efectivo, idActual);
+        if (duplicado) {
+            throw new DuplicadoException("Ya existe un estado de habitación con el nombre: " + efectivo);
+        }
+        return efectivo;
     }
 
     @Override
@@ -80,20 +97,19 @@ public class EstadoHabitacionServiceImpl implements EstadoHabitacionService {
     @Transactional
     public EstadoHabitacionDTO crear(EstadoHabitacionDTO dto) {
         if (dto == null || dto.descripcion() == null || dto.descripcion().trim().isEmpty()) {
-            throw new IllegalArgumentException("La descripción del estado de habitación es obligatoria");
+            throw new ReglaNegocioException("La descripción del estado de habitación es obligatoria");
         }
 
         String canonico = obtenerNombreCanonica(dto.descripcion());
 
         if (estadoHabitacionRepository.existsByDescripcionIgnoreCase(canonico)) {
-            throw new IllegalArgumentException("Ya existe un estado de habitación con la descripción: " + canonico);
+            throw new DuplicadoException("Ya existe un estado de habitación con la descripción: " + canonico);
         }
 
         EstadoHabitacion entity = mapToEntity(dto);
         entity.setDescripcion(canonico);
-        if (entity.getNombre() == null || entity.getNombre().isBlank()) {
-            entity.setNombre(canonico);
-        }
+        // `nombre` es NOT NULL y UNIQUE (30 caracteres): si falta se copia de la descripción
+        entity.setNombre(validarNombre(dto.nombre(), canonico, null));
         if (entity.getActivo() == null) {
             entity.setActivo(true);
         }
@@ -106,7 +122,7 @@ public class EstadoHabitacionServiceImpl implements EstadoHabitacionService {
     @Transactional
     public EstadoHabitacionDTO actualizar(EstadoHabitacionDTO dto, Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID del estado de habitación es obligatorio");
+            throw new ReglaNegocioException("El ID del estado de habitación es obligatorio");
         }
 
         EstadoHabitacion existente = estadoHabitacionRepository.findById(id)
@@ -115,7 +131,7 @@ public class EstadoHabitacionServiceImpl implements EstadoHabitacionService {
         // Regla: No se permite renombrar un estado base fijo usado por el código del hospital
         if (ESTADOS_BASE.contains(existente.getDescripcion())) {
             if (dto.descripcion() != null && !dto.descripcion().equalsIgnoreCase(existente.getDescripcion())) {
-                throw new IllegalArgumentException("No se permite renombrar el estado base fijo '" +
+                throw new ReglaNegocioException("No se permite renombrar el estado base fijo '" +
                         existente.getDescripcion() + "'");
             }
         }
@@ -123,13 +139,13 @@ public class EstadoHabitacionServiceImpl implements EstadoHabitacionService {
         if (dto.descripcion() != null && !dto.descripcion().trim().isEmpty()) {
             String canonico = obtenerNombreCanonica(dto.descripcion());
             if (estadoHabitacionRepository.existsByDescripcionIgnoreCaseAndIdEstadoHabitacionNot(canonico, id)) {
-                throw new IllegalArgumentException("Ya existe otro estado de habitación con la descripción: " + canonico);
+                throw new DuplicadoException("Ya existe otro estado de habitación con la descripción: " + canonico);
             }
             existente.setDescripcion(canonico);
         }
 
-        if (dto.nombre() != null) {
-            existente.setNombre(dto.nombre());
+        if (dto.nombre() != null && !dto.nombre().isBlank()) {
+            existente.setNombre(validarNombre(dto.nombre(), existente.getDescripcion(), id));
         }
         if (dto.activo() != null) {
             existente.setActivo(dto.activo());
@@ -143,7 +159,7 @@ public class EstadoHabitacionServiceImpl implements EstadoHabitacionService {
     @Transactional
     public void eliminar(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID del estado de habitación es obligatorio");
+            throw new ReglaNegocioException("El ID del estado de habitación es obligatorio");
         }
 
         EstadoHabitacion existente = estadoHabitacionRepository.findById(id)
@@ -151,14 +167,14 @@ public class EstadoHabitacionServiceImpl implements EstadoHabitacionService {
 
         // Regla: No se pueden borrar estados base fijos (Disponible, Ocupada, Mantenimiento)
         if (ESTADOS_BASE.contains(existente.getDescripcion())) {
-            throw new IllegalArgumentException("No se puede eliminar el estado base '" +
+            throw new ReglaNegocioException("No se puede eliminar el estado base '" +
                     existente.getDescripcion() + "' requerido por la lógica del sistema");
         }
 
         // Regla de Integridad: No eliminar si está asignado a habitaciones
         boolean asignadoAHabitaciones = habitacionRepository.existsByIdEstadoHabitacion(id);
         if (asignadoAHabitaciones) {
-            throw new IllegalArgumentException("No se puede eliminar el estado porque se encuentra asignado a una o más habitaciones");
+            throw new DuplicadoException("No se puede eliminar el estado porque se encuentra asignado a una o más habitaciones");
         }
 
         // Eliminación lógica

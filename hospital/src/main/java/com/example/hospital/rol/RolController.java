@@ -1,5 +1,6 @@
 package com.example.hospital.rol;
 
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -44,20 +45,20 @@ public class RolController {
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     @Operation(summary = "Registrar rol", description = "Crea un nuevo rol.\n\nRoles permitidos: ADMIN.")
-    public ResponseEntity<RolDTO> crear(@RequestBody RolDTO dto) {
+    public ResponseEntity<RolDTO> crear(@Valid @RequestBody RolDTO dto) {
         return new ResponseEntity<>(rolService.crear(dto), HttpStatus.CREATED);
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
-    @Operation(summary = "Actualizar rol", description = "Modifica un rol.\n\nRoles permitidos: ADMIN.")
-    public ResponseEntity<RolDTO> actualizar(@PathVariable Long id, @RequestBody RolDTO dto) {
+    @Operation(summary = "Actualizar rol", description = "Modifica un rol. Los 6 roles base (ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA, FARMACEUTICO, CAJERO) no se pueden renombrar (422).\n\nRoles permitidos: ADMIN.")
+    public ResponseEntity<RolDTO> actualizar(@PathVariable Long id, @Valid @RequestBody RolDTO dto) {
         return ResponseEntity.ok(rolService.actualizar(dto, id));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
-    @Operation(summary = "Eliminar rol", description = "Elimina un rol. No se permite si hay usuarios con ese rol.\n\nRoles permitidos: ADMIN.")
+    @Operation(summary = "Eliminar rol", description = "Desactiva un rol. 409 si hay usuarios activos con ese rol.\n\nRoles permitidos: ADMIN.")
     public ResponseEntity<Void> eliminar(@PathVariable Long id) {
         rolService.eliminar(id);
         return ResponseEntity.noContent().build();

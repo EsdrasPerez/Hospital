@@ -11,6 +11,9 @@ public interface DiagnosticosService {
 
     List<DiagnosticosDTO> findActivos();
 
+    /** Filtros opcionales y combinables. */
+    List<DiagnosticosDTO> buscar(Long idTipoDiagnostico, LocalDate fecha, boolean soloActivos);
+
     List<DiagnosticosDTO> findByTipo(Long idTipoDiagnostico);
 
     List<DiagnosticosDTO> findByFecha(LocalDate fecha);

@@ -288,6 +288,7 @@ CREATE TABLE habitacion (
                             numero VARCHAR(10) NOT NULL UNIQUE,
                             piso INT NOT NULL,
                             capacidad INT NOT NULL DEFAULT 1 CHECK (capacidad > 0),
+                            id_tipo_habitacion BIGINT REFERENCES tipos_habitacion(id_tipo_habitacion),
                             id_estado_habitacion BIGINT NOT NULL REFERENCES estado_habitacion(id_estado_habitacion),
                             activo BOOLEAN NOT NULL DEFAULT TRUE
 );
@@ -359,6 +360,7 @@ CREATE TABLE facturas (
                           iva DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (iva >= 0),
                           total DECIMAL(10,2) NOT NULL,
                           id_estado_factura BIGINT NOT NULL REFERENCES estados_factura(id_estado_factura),
+                          id_metodo_pago BIGINT REFERENCES metodos_pago(id_metodo_pago),
                           activo BOOLEAN NOT NULL DEFAULT TRUE,
                           CHECK (total = subtotal + iva)
 );

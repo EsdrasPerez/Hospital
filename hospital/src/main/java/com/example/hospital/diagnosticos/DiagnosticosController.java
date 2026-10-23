@@ -1,6 +1,7 @@
 package com.example.hospital.diagnosticos;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,16 +36,7 @@ public class DiagnosticosController {
             @RequestParam(required = false, defaultValue = "false") boolean soloActivos,
             @RequestParam(required = false) Long idTipoDiagnostico,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
-        if (idTipoDiagnostico != null) {
-            return diagnosticosService.findByTipo(idTipoDiagnostico);
-        }
-        if (fecha != null) {
-            return diagnosticosService.findByFecha(fecha);
-        }
-        if (soloActivos) {
-            return diagnosticosService.findActivos();
-        }
-        return diagnosticosService.findAll();
+        return diagnosticosService.buscar(idTipoDiagnostico, fecha, soloActivos);
     }
 
     @GetMapping("/{id}")
@@ -56,7 +48,7 @@ public class DiagnosticosController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO')")
     @PostMapping
     @Operation(summary = "Registrar diagnóstico", description = "Registra un nuevo diagnóstico médico.\n\nRoles permitidos: ADMIN, MEDICO.")
-    public ResponseEntity<DiagnosticosDTO> save(@RequestBody DiagnosticosDTO dto) {
+    public ResponseEntity<DiagnosticosDTO> save(@Valid @RequestBody DiagnosticosDTO dto) {
         DiagnosticosDTO creado = diagnosticosService.crear(dto);
         return new ResponseEntity<>(creado, HttpStatus.CREATED);
     }
@@ -66,7 +58,7 @@ public class DiagnosticosController {
     @Operation(summary = "Actualizar diagnóstico", description = "Modifica la información de un diagnóstico.\n\nRoles permitidos: ADMIN, MEDICO.")
     public ResponseEntity<DiagnosticosDTO> update(
             @PathVariable Long id,
-            @RequestBody DiagnosticosDTO dto) {
+            @Valid @RequestBody DiagnosticosDTO dto) {
         DiagnosticosDTO actualizado = diagnosticosService.actualizar(dto, id);
         return ResponseEntity.ok(actualizado);
     }

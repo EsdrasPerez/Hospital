@@ -2,6 +2,7 @@ package com.example.hospital.paciente;
 
 import com.example.hospital.paciente.dto.PacienteRequest;
 import com.example.hospital.paciente.dto.PacienteResponse;
+import com.example.hospital.paciente.dto.PacienteResumenDTO;
 import com.example.hospital.shared.constants.ApiConstants;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -31,18 +32,39 @@ public class PacienteController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','MEDICO','ENFERMERO','RECEPCIONISTA')")
-    @Operation(summary = "Listar / buscar pacientes", description = "Devuelve los pacientes activos. Parámetros opcionales:\n- `q`: busca por nombre, apellido paterno o DPI (coincidencia parcial)\n- `todos=true`: incluye también los pacientes inactivos\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA.")
+    @Operation(summary = "Listar / buscar pacientes", description = "Devuelve los pacientes activos. Parámetros opcionales:\n- `q`: busca por nombre, apellido paterno, apellido materno o DPI (coincidencia parcial, sin distinguir mayúsculas)\n- `todos=true`: incluye también los pacientes inactivos (también cuando se usa junto con `q`)\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA.")
     @ApiResponse(responseCode = "200", description = "Lista de pacientes")
     public List<PacienteResponse> listar(
             @RequestParam(required = false, defaultValue = "false") boolean todos,
             @RequestParam(required = false) String q) {
         if (q != null && !q.trim().isEmpty()) {
-            return service.buscar(q);
+            return service.buscar(q, todos);
         }
         if (todos) {
             return service.listarTodos();
         }
         return service.listar();
+    }
+
+    // Mínimo privilegio para caja: CAJERO no puede leer el listado ni el detalle completo de pacientes, pero necesita identificar
+    // al paciente al emitir facturas y cuentas. Estos endpoints devuelven SOLO id, nombre completo y DPI.
+    // (Las rutas literales "/busqueda" y "/{id}/resumen" no chocan con "/{id}": Spring prefiere la coincidencia literal.)
+    @GetMapping("/busqueda")
+    @PreAuthorize("hasAnyRole('ADMIN','CAJERO','RECEPCIONISTA')")
+    @Operation(summary = "Búsqueda mínima de pacientes (caja)", description = "Busca pacientes ACTIVOS por nombre, apellidos o DPI (parcial, sin distinguir mayúsculas) y devuelve solo `idPaciente`, `nombreCompleto`, `dpiPaciente` y `activo`. NO expone teléfono, correo, dirección ni datos clínicos. `q` con menos de 2 caracteres devuelve lista vacía (200). Máximo 20 resultados, ordenados por nombre.\n\nJustificación: mínimo privilegio; permite a CAJERO identificar al paciente en facturas y cuentas sin darle acceso al listado completo.\n\nRoles permitidos: ADMIN, CAJERO, RECEPCIONISTA.")
+    public List<PacienteResumenDTO> busqueda(@RequestParam(required = false) String q) {
+        return service.buscarResumen(q);
+    }
+
+    @GetMapping("/{id}/resumen")
+    @PreAuthorize("hasAnyRole('ADMIN','CAJERO','RECEPCIONISTA')")
+    @Operation(summary = "Resumen mínimo de un paciente (caja)", description = "Devuelve solo `idPaciente`, `nombreCompleto`, `dpiPaciente` y `activo` de un paciente (activo o inactivo), para mostrar su nombre en facturas, cuentas y pagos. Responde 404 solo si no existe.\n\nJustificación: mínimo privilegio para caja.\n\nRoles permitidos: ADMIN, CAJERO, RECEPCIONISTA.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Resumen del paciente"),
+            @ApiResponse(responseCode = "404", description = "El paciente no existe")
+    })
+    public PacienteResumenDTO resumen(@PathVariable Long id) {
+        return service.resumen(id);
     }
 
     @GetMapping("/dpi/{dpi}")
@@ -58,13 +80,13 @@ public class PacienteController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','MEDICO','ENFERMERO','RECEPCIONISTA')")
-    @Operation(summary = "Obtener paciente por ID", description = "Devuelve los datos de un paciente activo. Responde 404 si no existe o está inactivo.\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA.")
+    @Operation(summary = "Obtener paciente por ID", description = "Devuelve los datos de un paciente, activo o inactivo (el campo `activo` lo indica). Responde 404 solo si no existe.\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO, RECEPCIONISTA.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Paciente encontrado"),
             @ApiResponse(responseCode = "404", description = "El paciente no existe")
     })
     public PacienteResponse obtener(@PathVariable Long id) {
-        return service.obtener(id);
+        return service.obtenerDetalle(id);
     }
 
     @PostMapping
@@ -103,7 +125,8 @@ public class PacienteController {
     @Operation(summary = "Desactivar paciente", description = "Borrado lógico del paciente. No se permite si tiene citas activas, una hospitalización en curso, un registro activo en emergencia o cuentas activas.\n\nRoles permitidos: ADMIN.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Paciente desactivado"),
-            @ApiResponse(responseCode = "404", description = "El paciente no existe")
+            @ApiResponse(responseCode = "404", description = "El paciente no existe o ya está inactivo"),
+            @ApiResponse(responseCode = "422", description = "Tiene citas activas, hospitalización en curso, registro activo en emergencia o cuentas activas")
     })
     public void eliminar(@PathVariable Long id) {
         service.eliminar(id);

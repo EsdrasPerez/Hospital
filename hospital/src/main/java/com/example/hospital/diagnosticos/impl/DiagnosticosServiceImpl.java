@@ -2,6 +2,7 @@ package com.example.hospital.diagnosticos.impl;
 
 import com.example.hospital.diagnosticoconsulta.DiagnosticoConsultaRepository;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.diagnosticos.Diagnosticos;
 import com.example.hospital.diagnosticos.DiagnosticosRepository;
 import com.example.hospital.diagnosticos.DiagnosticosService;
@@ -56,36 +57,19 @@ public class DiagnosticosServiceImpl implements DiagnosticosService {
     }
 
     /**
-     * Valida las reglas de negocio de diagnósticos:
-     * 1. La descripción u observaciones son obligatorias.
-     * 2. El tipo de diagnóstico (Presuntivo, Definitivo, etc.) debe existir y estar activo.
-     * 3. La fecha del diagnóstico no puede ser futura respecto al día actual.
+     * Valida las reglas de negocio de diagnósticos (los campos obligatorios, el largo de la
+     * descripción y que la fecha no sea futura los valida Bean Validation en DiagnosticosDTO):
+     * el tipo de diagnóstico (Presuntivo, Definitivo, etc.) debe existir y estar activo.
      */
     private void validarReglasDeNegocio(DiagnosticosDTO dto) {
         if (dto == null) {
-            throw new IllegalArgumentException("Los datos del diagnóstico no pueden ser nulos");
+            throw new ReglaNegocioException("Los datos del diagnóstico no pueden ser nulos");
         }
-
-        if ((dto.descripcion() == null || dto.descripcion().trim().isEmpty())
-                && (dto.observaciones() == null || dto.observaciones().trim().isEmpty())) {
-            throw new IllegalArgumentException("La descripción o las observaciones del diagnóstico son obligatorias");
-        }
-
-        if (dto.idTipoDiagnostico() == null) {
-            throw new IllegalArgumentException("El tipo de diagnóstico es obligatorio");
-        }
-
         // RN-01: El tipo de diagnóstico debe existir y estar activo
         TiposDiagnostico tipo = tiposDiagnosticoRepository.findById(dto.idTipoDiagnostico())
-                .orElseThrow(() -> new IllegalArgumentException("El tipo de diagnóstico con ID " + dto.idTipoDiagnostico() + " no existe"));
-
+                .orElseThrow(() -> new ReglaNegocioException("El tipo de diagnóstico con ID " + dto.idTipoDiagnostico() + " no existe"));
         if (tipo.getActivo() != null && !tipo.getActivo()) {
-            throw new IllegalArgumentException("El tipo de diagnóstico '" + tipo.getDescripcion() + "' se encuentra inactivo");
-        }
-
-        // RN-02: La fecha del diagnóstico no puede ser futura
-        if (dto.fecha() != null && dto.fecha().isAfter(LocalDate.now())) {
-            throw new IllegalArgumentException("La fecha del diagnóstico no puede ser posterior a la fecha actual (" + LocalDate.now() + ")");
+            throw new ReglaNegocioException("El tipo de diagnóstico '" + tipo.getDescripcion() + "' se encuentra inactivo");
         }
     }
 
@@ -106,9 +90,20 @@ public class DiagnosticosServiceImpl implements DiagnosticosService {
     }
 
     @Override
+    public List<DiagnosticosDTO> buscar(Long idTipoDiagnostico, LocalDate fecha, boolean soloActivos) {
+        return diagnosticosRepository.findAll()
+                .stream()
+                .filter(d -> idTipoDiagnostico == null || idTipoDiagnostico.equals(d.getIdTipoDiagnostico()))
+                .filter(d -> fecha == null || fecha.equals(d.getFecha()))
+                .filter(d -> !soloActivos || Boolean.TRUE.equals(d.getActivo()))
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public List<DiagnosticosDTO> findByTipo(Long idTipoDiagnostico) {
         if (idTipoDiagnostico == null) {
-            throw new IllegalArgumentException("El ID del tipo de diagnóstico es obligatorio");
+            throw new ReglaNegocioException("El ID del tipo de diagnóstico es obligatorio");
         }
         return diagnosticosRepository.findByIdTipoDiagnostico(idTipoDiagnostico)
                 .stream()
@@ -119,7 +114,7 @@ public class DiagnosticosServiceImpl implements DiagnosticosService {
     @Override
     public List<DiagnosticosDTO> findByFecha(LocalDate fecha) {
         if (fecha == null) {
-            throw new IllegalArgumentException("La fecha es obligatoria");
+            throw new ReglaNegocioException("La fecha es obligatoria");
         }
         return diagnosticosRepository.findByFecha(fecha)
                 .stream()
@@ -155,7 +150,7 @@ public class DiagnosticosServiceImpl implements DiagnosticosService {
     @Transactional
     public DiagnosticosDTO actualizar(DiagnosticosDTO dto, Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID del diagnóstico es obligatorio");
+            throw new ReglaNegocioException("El ID del diagnóstico es obligatorio");
         }
 
         Diagnosticos existente = diagnosticosRepository.findById(id)
@@ -181,7 +176,7 @@ public class DiagnosticosServiceImpl implements DiagnosticosService {
     @Transactional
     public void eliminar(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID del diagnóstico es obligatorio");
+            throw new ReglaNegocioException("El ID del diagnóstico es obligatorio");
         }
 
         Diagnosticos existente = diagnosticosRepository.findById(id)

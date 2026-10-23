@@ -1,5 +1,7 @@
 package com.example.hospital.usuarios;
 
+import org.springframework.validation.annotation.Validated;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -43,25 +45,25 @@ public class UsuariosController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
-    @Operation(summary = "Crear usuario", description = "Crea un usuario del sistema con su rol.\n\nRoles permitidos: ADMIN.")
-    public ResponseEntity<UsuariosDTO> save(@RequestBody UsuariosDTO dto) {
+    @Operation(summary = "Crear usuario", description = "Crea un usuario del sistema. Obligatorios: `nombreUsuario`, `password` (mínimo 8 caracteres) e `idRol` (sin rol por defecto). Errores: 400 (campos inválidos, con `detalles`), 409 (nombre de usuario repetido), 422 (rol inexistente o inactivo). La respuesta nunca incluye la contraseña.\n\nRoles permitidos: ADMIN.")
+    public ResponseEntity<UsuariosDTO> save(@Validated(UsuariosDTO.Crear.class) @RequestBody UsuariosDTO dto) {
         UsuariosDTO creado = usuariosService.crear(dto);
         return new ResponseEntity<>(creado, HttpStatus.CREATED);
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
-    @Operation(summary = "Actualizar usuario", description = "Modifica los datos o el rol de un usuario.\n\nRoles permitidos: ADMIN.")
+    @Operation(summary = "Actualizar usuario", description = "Modifica el nombre, la contraseña (mínimo 8 caracteres), el estado o el rol; solo cambia lo que se envía. Errores: 400, 404, 409 (nombre repetido), 422 (rol inexistente o inactivo; un ADMIN no puede desactivarse ni quitarse el rol a sí mismo; no se puede desactivar ni degradar al último ADMIN activo).\n\nRoles permitidos: ADMIN.")
     public ResponseEntity<UsuariosDTO> update(
             @PathVariable Long id,
-            @RequestBody UsuariosDTO dto) {
+            @Valid @RequestBody UsuariosDTO dto) {
         UsuariosDTO actualizado = usuariosService.actualizar(dto, id);
         return ResponseEntity.ok(actualizado);
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
-    @Operation(summary = "Eliminar usuario", description = "Desactiva un usuario del sistema.\n\nRoles permitidos: ADMIN.")
+    @Operation(summary = "Eliminar usuario", description = "Desactiva un usuario del sistema (no puede iniciar sesión y su token deja de ser válido). 422 si es uno mismo o el último ADMIN activo.\n\nRoles permitidos: ADMIN.")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         usuariosService.eliminar(id);
         return ResponseEntity.noContent().build();

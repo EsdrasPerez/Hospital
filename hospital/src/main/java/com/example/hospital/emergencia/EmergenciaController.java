@@ -1,6 +1,7 @@
 package com.example.hospital.emergencia;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,17 +31,11 @@ public class EmergenciaController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar ingresos a emergencia", description = "Devuelve los ingresos a emergencia. Filtros opcionales:\n- `idPaciente`: ingresos de un paciente\n- `soloActivas=true`: solo registros activos\n\nAcceso: cualquier usuario autenticado.")
+    @Operation(summary = "Listar ingresos a emergencia", description = "Devuelve los ingresos a emergencia. Filtros opcionales y combinables:\n- `idPaciente`: ingresos de un paciente (activos e inactivos, salvo que también se envíe `soloActivas=true`)\n- `soloActivas=true`: solo registros activos\n\nAcceso: cualquier usuario autenticado.")
     public List<EmergenciaDTO> findAll(
             @RequestParam(required = false, defaultValue = "false") boolean soloActivas,
             @RequestParam(required = false) Long idPaciente) {
-        if (idPaciente != null) {
-            return emergenciaService.findByPaciente(idPaciente);
-        }
-        if (soloActivas) {
-            return emergenciaService.findActivas();
-        }
-        return emergenciaService.findAll();
+        return emergenciaService.buscar(idPaciente, soloActivas);
     }
 
     @GetMapping("/{id}")
@@ -52,24 +47,24 @@ public class EmergenciaController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO', 'ENFERMERO')")
     @PostMapping
     @Operation(summary = "Registrar ingreso a emergencia", description = "Registra la llegada de un paciente a emergencia con su motivo, signos vitales, nivel de triaje, médico y cama. Permite `nombreTemporal` cuando aún no se conoce la identidad del paciente.\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO.")
-    public ResponseEntity<EmergenciaDTO> save(@RequestBody EmergenciaDTO dto) {
+    public ResponseEntity<EmergenciaDTO> save(@Valid @RequestBody EmergenciaDTO dto) {
         EmergenciaDTO creada = emergenciaService.crear(dto);
         return new ResponseEntity<>(creada, HttpStatus.CREATED);
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO', 'ENFERMERO')")
     @PutMapping("/{id}")
-    @Operation(summary = "Actualizar ingreso", description = "Modifica los datos de un ingreso a emergencia.\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO.")
+    @Operation(summary = "Actualizar ingreso", description = "Modifica los datos de un ingreso a emergencia. No modifica la fecha de alta (se conserva): el alta se registra solo con `PATCH /{id}/dar-alta`. Responde 400 con `detalles` si faltan datos obligatorios, 422 si una referencia (paciente, médico, habitación, triaje) no existe o está inactiva.\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO.")
     public ResponseEntity<EmergenciaDTO> update(
             @PathVariable Long id,
-            @RequestBody EmergenciaDTO dto) {
+            @Valid @RequestBody EmergenciaDTO dto) {
         EmergenciaDTO actualizada = emergenciaService.actualizar(dto, id);
         return ResponseEntity.ok(actualizada);
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO', 'ENFERMERO')")
     @PatchMapping("/{id}/dar-alta")
-    @Operation(summary = "Dar de alta de emergencia", description = "Registra la salida del paciente de emergencia. Si no se envía `fechaHoraAlta`, se usa la fecha y hora actual.\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO.")
+    @Operation(summary = "Dar de alta de emergencia", description = "Registra la salida del paciente de emergencia. Si no se envía `fechaHoraAlta`, se usa la fecha y hora actual. Responde 409 si el alta ya estaba registrada y 422 si la emergencia está inactiva o el alta es anterior al ingreso.\n\nRoles permitidos: ADMIN, MEDICO, ENFERMERO.")
     public ResponseEntity<EmergenciaDTO> darAlta(
             @PathVariable Long id,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaHoraAlta) {

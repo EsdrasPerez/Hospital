@@ -8,6 +8,7 @@ public interface MedicamentosService {
     List<MedicamentosDTO> findActivos();
     MedicamentosDTO findById(Long id);
     List<MedicamentosDTO> buscar(String criterio);
+    List<MedicamentosDTO> buscar(String criterio, boolean bajoStock, boolean soloActivos);
     List<MedicamentosDTO> findBajoStock();
     MedicamentosDTO crear(MedicamentosDTO dto);
     MedicamentosDTO actualizar(MedicamentosDTO dto, Long id);

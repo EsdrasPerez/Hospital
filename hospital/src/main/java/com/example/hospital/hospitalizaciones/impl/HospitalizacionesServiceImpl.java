@@ -1,13 +1,19 @@
 package com.example.hospital.hospitalizaciones.impl;
 
 import com.example.hospital.clinicas.Clinicas;
+import com.example.hospital.shared.catalogos.EstadosCatalogo;
+import com.example.hospital.shared.exception.DuplicadoException;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.clinicas.ClinicasRepository;
 import com.example.hospital.habitacion.Habitacion;
 import com.example.hospital.habitacion.HabitacionRepository;
 import com.example.hospital.hospitalizaciones.Hospitalizaciones;
 import com.example.hospital.hospitalizaciones.HospitalizacionesRepository;
 import com.example.hospital.hospitalizaciones.HospitalizacionesService;
+import com.example.hospital.estadoshospitalizacion.EstadosHospitalizacion;
+import com.example.hospital.estadoshospitalizacion.EstadosHospitalizacionRepository;
+import com.example.hospital.hospitalizaciones.dto.HospitalizacionResumenDTO;
 import com.example.hospital.hospitalizaciones.dto.HospitalizacionesDTO;
 import com.example.hospital.medico.Medico;
 import com.example.hospital.medico.MedicoRepository;
@@ -23,32 +29,30 @@ import java.util.stream.Collectors;
 @Service
 public class HospitalizacionesServiceImpl implements HospitalizacionesService {
 
-    // Constantes de Estados de Hospitalización (según Hosp.sql: 1: Activa, 2: Alta, 3: Traslado, 4: Fallecimiento)
-    private static final Long ESTADO_HOSP_ACTIVA = 1L;
-    private static final Long ESTADO_HOSP_ALTA = 2L;
-
-    // Constantes de Estados de Habitación (según Hosp.sql: 1: Disponible, 2: Ocupada, 3: Mantenimiento)
-    private static final Long ESTADO_HAB_DISPONIBLE = 1L;
-    private static final Long ESTADO_HAB_OCUPADA = 2L;
-    private static final Long ESTADO_HAB_MANTENIMIENTO = 3L;
-
     private final HospitalizacionesRepository hospitalizacionesRepository;
     private final PacienteRepository pacienteRepository;
     private final HabitacionRepository habitacionRepository;
     private final MedicoRepository medicoRepository;
     private final ClinicasRepository clinicasRepository;
+    // Los estados (Activa, Alta, Disponible, Ocupada, Mantenimiento) se resuelven por nombre, no por id fijo
+    private final EstadosCatalogo estados;
+    private final EstadosHospitalizacionRepository estadosHospitalizacionRepository;
 
     public HospitalizacionesServiceImpl(
             HospitalizacionesRepository hospitalizacionesRepository,
             PacienteRepository pacienteRepository,
             HabitacionRepository habitacionRepository,
             MedicoRepository medicoRepository,
-            ClinicasRepository clinicasRepository) {
+            ClinicasRepository clinicasRepository,
+            EstadosCatalogo estados,
+            EstadosHospitalizacionRepository estadosHospitalizacionRepository) {
         this.hospitalizacionesRepository = hospitalizacionesRepository;
         this.pacienteRepository = pacienteRepository;
         this.habitacionRepository = habitacionRepository;
         this.medicoRepository = medicoRepository;
         this.clinicasRepository = clinicasRepository;
+        this.estados = estados;
+        this.estadosHospitalizacionRepository = estadosHospitalizacionRepository;
     }
 
     private HospitalizacionesDTO mapToDTO(Hospitalizaciones h) {
@@ -75,7 +79,7 @@ public class HospitalizacionesServiceImpl implements HospitalizacionesService {
         h.setIdClinica(dto.idClinica());
         h.setFechaIngreso(dto.fechaIngreso());
         h.setFechaAlta(dto.fechaAlta());
-        h.setMotivoIngreso(dto.motivoIngreso());
+        h.setMotivoIngreso(dto.motivoIngreso().trim());
         h.setDiagnosticoIngreso(dto.diagnosticoIngreso());
         h.setIdEstadoHosp(dto.idEstadoHosp());
         h.setActivo(dto.activo());
@@ -97,177 +101,176 @@ public class HospitalizacionesServiceImpl implements HospitalizacionesService {
         return mapToDTO(h);
     }
 
+    /*
+     * Convención de errores: los datos obligatorios y su formato los valida Bean Validation en
+     * HospitalizacionesDTO (400 con detalles); las referencias inexistentes o inactivas y las reglas de
+     * negocio responden 422; un conflicto con el estado actual (paciente ya hospitalizado, alta repetida,
+     * desactivar una hospitalización Activa) responde 409.
+     */
     @Override
     @Transactional
     public HospitalizacionesDTO registrar(HospitalizacionesDTO dto) {
         if (dto == null) {
-            throw new IllegalArgumentException("Los datos de la hospitalización son requeridos");
+            throw new ReglaNegocioException("Los datos de la hospitalización son requeridos");
         }
+        Long activa = estados.hospActiva();
 
-        // RN-01: El paciente debe existir
-        if (dto.idPaciente() == null) {
-            throw new IllegalArgumentException("El ID del paciente es obligatorio");
-        }
+        // RN-01: El paciente debe existir y estar activo
         Paciente paciente = pacienteRepository.findById(dto.idPaciente())
-                .orElseThrow(() -> new IllegalArgumentException("El paciente con ID " + dto.idPaciente() + " no existe"));
-
+                .orElseThrow(() -> new ReglaNegocioException("El paciente con ID " + dto.idPaciente() + " no existe"));
         if (Boolean.FALSE.equals(paciente.getActivo())) {
-            throw new IllegalArgumentException("El paciente seleccionado se encuentra inactivo");
+            throw new ReglaNegocioException("El paciente seleccionado se encuentra inactivo");
         }
 
-        // RN-02: Un paciente no puede tener dos hospitalizaciones activas simultáneamente
-        if (hospitalizacionesRepository.existsByIdPacienteAndIdEstadoHosp(dto.idPaciente(), ESTADO_HOSP_ACTIVA)) {
-            throw new IllegalArgumentException("El paciente ya cuenta con una hospitalización Activa");
+        // RN-02: Un paciente no puede tener dos hospitalizaciones activas simultáneamente (conflicto: 409)
+        if (hospitalizacionesRepository.existsByIdPacienteAndIdEstadoHosp(dto.idPaciente(), activa)) {
+            throw new DuplicadoException("El paciente ya cuenta con una hospitalización Activa");
         }
 
         // RN-03: El médico responsable debe existir y estar activo
-        if (dto.idMedicoResponsable() == null) {
-            throw new IllegalArgumentException("El médico responsable es obligatorio");
-        }
         Medico medico = medicoRepository.findById(dto.idMedicoResponsable())
-                .orElseThrow(() -> new IllegalArgumentException("El médico con ID " + dto.idMedicoResponsable() + " no existe"));
+                .orElseThrow(() -> new ReglaNegocioException("El médico con ID " + dto.idMedicoResponsable() + " no existe"));
         if (Boolean.FALSE.equals(medico.getEstado())) {
-            throw new IllegalArgumentException("El médico responsable se encuentra inactivo");
+            throw new ReglaNegocioException("El médico responsable se encuentra inactivo");
         }
 
-        // RN-04: Toda hospitalización debe tener una habitación asignada
-        if (dto.idHabitacion() == null) {
-            throw new IllegalArgumentException("Toda hospitalización debe tener una habitación asignada");
-        }
+        // RN-04: Toda hospitalización debe tener una habitación asignada, existente y activa
         Habitacion habitacion = habitacionRepository.findById(dto.idHabitacion())
-                .orElseThrow(() -> new IllegalArgumentException("La habitación con ID " + dto.idHabitacion() + " no existe"));
+                .orElseThrow(() -> new ReglaNegocioException("La habitación con ID " + dto.idHabitacion() + " no existe"));
+        if (Boolean.FALSE.equals(habitacion.getActivo())) {
+            throw new ReglaNegocioException("La habitación seleccionada se encuentra inactiva");
+        }
 
         // RN-06 / RN-16: No se pueden utilizar habitaciones en mantenimiento
-        if (ESTADO_HAB_MANTENIMIENTO.equals(habitacion.getIdEstadoHabitacion())) {
-            throw new IllegalArgumentException("La habitación se encuentra en mantenimiento y no puede recibir pacientes");
+        if (estados.habMantenimiento().equals(habitacion.getIdEstadoHabitacion())) {
+            throw new ReglaNegocioException("La habitación se encuentra en mantenimiento y no puede recibir pacientes");
         }
 
         // RN-05, RN-11, RN-12, RN-13: Verificar capacidad y ocupación actual
-        long ocupacionActual = hospitalizacionesRepository.countByIdHabitacionAndIdEstadoHosp(dto.idHabitacion(), ESTADO_HOSP_ACTIVA);
+        long ocupacionActual = hospitalizacionesRepository.countByIdHabitacionAndIdEstadoHosp(dto.idHabitacion(), activa);
         int capacidad = habitacion.getCapacidad() != null ? habitacion.getCapacidad() : 1;
         if (ocupacionActual >= capacidad) {
-            throw new IllegalArgumentException("La habitación " + habitacion.getNumero() + " ya alcanzó su capacidad máxima (" + capacidad + ")");
+            throw new ReglaNegocioException("La habitación " + habitacion.getNumero() + " ya alcanzó su capacidad máxima (" + capacidad + ")");
         }
 
         // RN-07: La fecha de ingreso no puede ser posterior a la fecha actual
         LocalDateTime fechaIngreso = dto.fechaIngreso() != null ? dto.fechaIngreso() : LocalDateTime.now();
         if (fechaIngreso.isAfter(LocalDateTime.now())) {
-            throw new IllegalArgumentException("La fecha de ingreso no puede ser posterior a la fecha actual");
+            throw new ReglaNegocioException("La fecha de ingreso no puede ser posterior a la fecha actual");
         }
 
-        // RN-08: El motivo de ingreso debe ser obligatorio
-        if (dto.motivoIngreso() == null || dto.motivoIngreso().trim().isEmpty()) {
-            throw new IllegalArgumentException("El motivo de ingreso es obligatorio");
-        }
+        // RN-08: El motivo de ingreso es obligatorio (lo valida Bean Validation en el DTO)
 
         // RN-09: La clínica asignada, cuando exista, debe estar activa
         if (dto.idClinica() != null) {
-            Clinicas clinica = clinicasRepository.findById(dto.idClinica())
-                    .orElseThrow(() -> new IllegalArgumentException("La clínica con ID " + dto.idClinica() + " no existe"));
-            if (Boolean.FALSE.equals(clinica.getEstadoClinica())) {
-                throw new IllegalArgumentException("La clínica asignada no se encuentra activa");
-            }
+            validarClinica(dto.idClinica());
         }
 
         // Construir entidad
         Hospitalizaciones h = mapToEntity(dto);
         h.setFechaIngreso(fechaIngreso);
-        // RN-10: Toda hospitalización nueva debe iniciar con estado Activa
-        h.setIdEstadoHosp(ESTADO_HOSP_ACTIVA);
+        // RN-10: Toda hospitalización nueva debe iniciar con estado Activa, sin alta
+        h.setIdEstadoHosp(activa);
+        h.setFechaAlta(null);
         h.setActivo(true);
 
         Hospitalizaciones guardada = hospitalizacionesRepository.save(h);
 
         // RN-14: Si con este ingreso la habitación alcanza su capacidad máxima, actualizar a Ocupada
         if ((ocupacionActual + 1) >= capacidad) {
-            habitacion.setIdEstadoHabitacion(ESTADO_HAB_OCUPADA);
+            habitacion.setIdEstadoHabitacion(estados.habOcupada());
             habitacionRepository.save(habitacion);
         }
 
         return mapToDTO(guardada);
     }
 
+    private void validarClinica(Long idClinica) {
+        Clinicas clinica = clinicasRepository.findById(idClinica)
+                .orElseThrow(() -> new ReglaNegocioException("La clínica con ID " + idClinica + " no existe"));
+        if (Boolean.FALSE.equals(clinica.getEstadoClinica())) {
+            throw new ReglaNegocioException("La clínica asignada no se encuentra activa");
+        }
+    }
+
+    /**
+     * PUT = reemplazo de los campos editables: médico responsable, habitación (traslado), clínica,
+     * motivo y diagnóstico de ingreso. Un null en clínica o diagnóstico de ingreso los borra.
+     * No se modifican el paciente, la fecha de ingreso, la fecha de alta ni el estado.
+     */
     @Override
     @Transactional
     public HospitalizacionesDTO actualizar(HospitalizacionesDTO dto, Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID de hospitalización es obligatorio");
+            throw new ReglaNegocioException("El ID de hospitalización es obligatorio");
         }
 
         Hospitalizaciones existente = hospitalizacionesRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe la hospitalización con ID: " + id));
+        Long activa = estados.hospActiva();
 
         // RN-17 / RN-22: Solo se podrán modificar hospitalizaciones que estén activas
-        if (!ESTADO_HOSP_ACTIVA.equals(existente.getIdEstadoHosp())) {
-            throw new IllegalArgumentException("No se permite modificar una hospitalización finalizada o no activa");
+        if (!activa.equals(existente.getIdEstadoHosp())) {
+            throw new ReglaNegocioException("No se permite modificar una hospitalización finalizada o no activa");
         }
 
         // RN-21: No se podrá modificar el paciente asociado a una hospitalización ya registrada
-        if (dto.idPaciente() != null && !dto.idPaciente().equals(existente.getIdPaciente())) {
-            throw new IllegalArgumentException("No se permite modificar el paciente asociado a una hospitalización registrada");
+        if (!dto.idPaciente().equals(existente.getIdPaciente())) {
+            throw new ReglaNegocioException("No se permite modificar el paciente asociado a una hospitalización registrada");
         }
 
         // RN-18: El médico responsable podrá cambiarse únicamente por otro médico activo
-        if (dto.idMedicoResponsable() != null && !dto.idMedicoResponsable().equals(existente.getIdMedicoResponsable())) {
+        if (!dto.idMedicoResponsable().equals(existente.getIdMedicoResponsable())) {
             Medico nuevoMedico = medicoRepository.findById(dto.idMedicoResponsable())
-                    .orElseThrow(() -> new IllegalArgumentException("El médico con ID " + dto.idMedicoResponsable() + " no existe"));
+                    .orElseThrow(() -> new ReglaNegocioException("El médico con ID " + dto.idMedicoResponsable() + " no existe"));
             if (Boolean.FALSE.equals(nuevoMedico.getEstado())) {
-                throw new IllegalArgumentException("El nuevo médico responsable no está activo");
+                throw new ReglaNegocioException("El nuevo médico responsable no está activo");
             }
             existente.setIdMedicoResponsable(dto.idMedicoResponsable());
         }
 
         // RN-19 / RN-20: Traslado a otra habitación
-        if (dto.idHabitacion() != null && !dto.idHabitacion().equals(existente.getIdHabitacion())) {
+        if (!dto.idHabitacion().equals(existente.getIdHabitacion())) {
             Habitacion nuevaHabitacion = habitacionRepository.findById(dto.idHabitacion())
-                    .orElseThrow(() -> new IllegalArgumentException("La nueva habitación no existe"));
-
-            if (ESTADO_HAB_MANTENIMIENTO.equals(nuevaHabitacion.getIdEstadoHabitacion())) {
-                throw new IllegalArgumentException("La nueva habitación está en mantenimiento");
+                    .orElseThrow(() -> new ReglaNegocioException("La nueva habitación no existe"));
+            if (Boolean.FALSE.equals(nuevaHabitacion.getActivo())) {
+                throw new ReglaNegocioException("La nueva habitación se encuentra inactiva");
             }
-
-            long ocupacionNueva = hospitalizacionesRepository.countByIdHabitacionAndIdEstadoHosp(dto.idHabitacion(), ESTADO_HOSP_ACTIVA);
+            if (estados.habMantenimiento().equals(nuevaHabitacion.getIdEstadoHabitacion())) {
+                throw new ReglaNegocioException("La nueva habitación está en mantenimiento");
+            }
+            long ocupacionNueva = hospitalizacionesRepository.countByIdHabitacionAndIdEstadoHosp(dto.idHabitacion(), activa);
             int capacidadNueva = nuevaHabitacion.getCapacidad() != null ? nuevaHabitacion.getCapacidad() : 1;
             if (ocupacionNueva >= capacidadNueva) {
-                throw new IllegalArgumentException("La nueva habitación ya alcanzó su capacidad máxima");
+                throw new ReglaNegocioException("La nueva habitación ya alcanzó su capacidad máxima");
             }
 
             // Liberar o ajustar la habitación anterior
             Habitacion habitacionAnterior = habitacionRepository.findById(existente.getIdHabitacion()).orElse(null);
             if (habitacionAnterior != null) {
-                long ocupacionAnterior = hospitalizacionesRepository.countByIdHabitacionAndIdEstadoHosp(habitacionAnterior.getIdHabitacion(), ESTADO_HOSP_ACTIVA);
+                long ocupacionAnterior = hospitalizacionesRepository.countByIdHabitacionAndIdEstadoHosp(habitacionAnterior.getIdHabitacion(), activa);
                 // Si la ocupación anterior queda en 1 (que era este paciente que se va), pasará a Disponible
-                if (ocupacionAnterior <= 1 && !ESTADO_HAB_MANTENIMIENTO.equals(habitacionAnterior.getIdEstadoHabitacion())) {
-                    habitacionAnterior.setIdEstadoHabitacion(ESTADO_HAB_DISPONIBLE);
+                if (ocupacionAnterior <= 1 && !estados.habMantenimiento().equals(habitacionAnterior.getIdEstadoHabitacion())) {
+                    habitacionAnterior.setIdEstadoHabitacion(estados.habDisponible());
                     habitacionRepository.save(habitacionAnterior);
                 }
             }
 
             // Actualizar la nueva habitación si se llena
             if ((ocupacionNueva + 1) >= capacidadNueva) {
-                nuevaHabitacion.setIdEstadoHabitacion(ESTADO_HAB_OCUPADA);
+                nuevaHabitacion.setIdEstadoHabitacion(estados.habOcupada());
                 habitacionRepository.save(nuevaHabitacion);
             }
-
             existente.setIdHabitacion(dto.idHabitacion());
         }
 
-        if (dto.motivoIngreso() != null && !dto.motivoIngreso().trim().isEmpty()) {
-            existente.setMotivoIngreso(dto.motivoIngreso());
-        }
-
-        if (dto.diagnosticoIngreso() != null) {
-            existente.setDiagnosticoIngreso(dto.diagnosticoIngreso());
-        }
-
+        existente.setMotivoIngreso(dto.motivoIngreso().trim());
+        // Reemplazo: null borra el diagnóstico de ingreso y la clínica
+        existente.setDiagnosticoIngreso(dto.diagnosticoIngreso());
         if (dto.idClinica() != null) {
-            Clinicas clinica = clinicasRepository.findById(dto.idClinica())
-                    .orElseThrow(() -> new IllegalArgumentException("La clínica no existe"));
-            if (Boolean.FALSE.equals(clinica.getEstadoClinica())) {
-                throw new IllegalArgumentException("La clínica no está activa");
-            }
-            existente.setIdClinica(dto.idClinica());
+            validarClinica(dto.idClinica());
         }
+        existente.setIdClinica(dto.idClinica());
 
         Hospitalizaciones actualizada = hospitalizacionesRepository.save(existente);
         return mapToDTO(actualizada);
@@ -277,27 +280,27 @@ public class HospitalizacionesServiceImpl implements HospitalizacionesService {
     @Transactional
     public HospitalizacionesDTO darAlta(Long id, LocalDateTime fechaAlta) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID de hospitalización es obligatorio");
+            throw new ReglaNegocioException("El ID de hospitalización es obligatorio");
         }
 
         Hospitalizaciones existente = hospitalizacionesRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe la hospitalización con ID: " + id));
 
         // RN-23: Solo se podrá registrar el alta de una hospitalización activa
-        // RN-25: No se podrá registrar dos veces el alta de la misma hospitalización
-        if (!ESTADO_HOSP_ACTIVA.equals(existente.getIdEstadoHosp())) {
-            throw new IllegalArgumentException("Solo se puede dar de alta una hospitalización que se encuentre Activa");
+        // RN-25: No se podrá registrar dos veces el alta de la misma hospitalización (conflicto: 409)
+        if (!estados.hospActiva().equals(existente.getIdEstadoHosp())) {
+            throw new DuplicadoException("Solo se puede dar de alta una hospitalización que se encuentre Activa");
         }
 
         LocalDateTime fechaAltaEfectiva = fechaAlta != null ? fechaAlta : LocalDateTime.now();
 
         // RN-24: La fecha de alta no puede ser anterior a la fecha de ingreso
         if (existente.getFechaIngreso() != null && fechaAltaEfectiva.isBefore(existente.getFechaIngreso())) {
-            throw new IllegalArgumentException("La fecha de alta no puede ser anterior a la fecha de ingreso");
+            throw new ReglaNegocioException("La fecha de alta no puede ser anterior a la fecha de ingreso");
         }
 
         // RN-27: Se cambia el estado a Alta (no podrá volver a Activa)
-        existente.setIdEstadoHosp(ESTADO_HOSP_ALTA);
+        existente.setIdEstadoHosp(estados.hospAlta());
         existente.setFechaAlta(fechaAltaEfectiva);
 
         Hospitalizaciones guardada = hospitalizacionesRepository.save(existente);
@@ -305,10 +308,10 @@ public class HospitalizacionesServiceImpl implements HospitalizacionesService {
         // RN-15 / RN-26: Al registrar el alta, se deberá liberar la ocupación correspondiente de la habitación
         if (existente.getIdHabitacion() != null) {
             Habitacion habitacion = habitacionRepository.findById(existente.getIdHabitacion()).orElse(null);
-            if (habitacion != null && !ESTADO_HAB_MANTENIMIENTO.equals(habitacion.getIdEstadoHabitacion())) {
-                long ocupacionRestante = hospitalizacionesRepository.countByIdHabitacionAndIdEstadoHosp(habitacion.getIdHabitacion(), ESTADO_HOSP_ACTIVA);
+            if (habitacion != null && !estados.habMantenimiento().equals(habitacion.getIdEstadoHabitacion())) {
+                long ocupacionRestante = hospitalizacionesRepository.countByIdHabitacionAndIdEstadoHosp(habitacion.getIdHabitacion(), estados.hospActiva());
                 if (ocupacionRestante == 0) {
-                    habitacion.setIdEstadoHabitacion(ESTADO_HAB_DISPONIBLE);
+                    habitacion.setIdEstadoHabitacion(estados.habDisponible());
                     habitacionRepository.save(habitacion);
                 }
             }
@@ -323,6 +326,13 @@ public class HospitalizacionesServiceImpl implements HospitalizacionesService {
     public void eliminar(Long id) {
         Hospitalizaciones existente = hospitalizacionesRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe la hospitalización con ID: " + id));
+
+        // Una hospitalización Activa mantiene ocupada la habitación y bloquea al paciente: primero hay que
+        // darla de alta (conflicto con el estado actual: 409). Desactivar una con alta sí está permitido.
+        if (estados.hospActiva().equals(existente.getIdEstadoHosp())) {
+            throw new DuplicadoException("No se puede desactivar una hospitalización Activa; registre primero el alta del paciente");
+        }
+
         // Borrado lógico para conservar historial (RN-29)
         existente.setActivo(false);
         hospitalizacionesRepository.save(existente);
@@ -331,9 +341,30 @@ public class HospitalizacionesServiceImpl implements HospitalizacionesService {
     @Override
     @Transactional(readOnly = true)
     public List<HospitalizacionesDTO> findActivas() {
-        return hospitalizacionesRepository.findByIdEstadoHosp(ESTADO_HOSP_ACTIVA)
+        return hospitalizacionesRepository.findByIdEstadoHosp(estados.hospActiva())
                 .stream()
                 .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<HospitalizacionResumenDTO> resumenPorPaciente(Long idPaciente) {
+        if (!pacienteRepository.existsById(idPaciente)) {
+            throw new RecursoNoEncontradoException("No existe el paciente con ID: " + idPaciente);
+        }
+        return hospitalizacionesRepository.findByIdPaciente(idPaciente).stream()
+                .filter(h -> !Boolean.FALSE.equals(h.getActivo()))
+                .sorted(java.util.Comparator.comparing(Hospitalizaciones::getFechaIngreso,
+                        java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+                .map(h -> new HospitalizacionResumenDTO(
+                        h.getIdHospitalizacion(),
+                        h.getFechaIngreso(),
+                        h.getFechaAlta(),
+                        h.getIdEstadoHosp() == null ? null : estadosHospitalizacionRepository.findById(h.getIdEstadoHosp())
+                                .map(EstadosHospitalizacion::getDescripcion).orElse(null),
+                        h.getIdHabitacion() == null ? null : habitacionRepository.findById(h.getIdHabitacion())
+                                .map(Habitacion::getNumero).orElse(null)))
                 .collect(Collectors.toList());
     }
 

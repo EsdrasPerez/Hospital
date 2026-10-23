@@ -1,7 +1,9 @@
 package com.example.hospital.consultas.impl;
 
 import com.example.hospital.citas.Citas;
+import com.example.hospital.shared.exception.DuplicadoException;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.citas.CitasRepository;
 import com.example.hospital.consultas.Consultas;
 import com.example.hospital.consultas.ConsultasRepository;
@@ -10,38 +12,39 @@ import com.example.hospital.consultas.dto.ConsultasDTO;
 import com.example.hospital.diagnosticoconsulta.DiagnosticoConsultaRepository;
 import com.example.hospital.estadocita.EstadoCita;
 import com.example.hospital.estadocita.EstadoCitaRepository;
+import com.example.hospital.estadocita.EstadoCitaService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 public class ConsultasServiceImpl implements ConsultasService {
 
-    // Rangos clínicos permitidos
-    private static final BigDecimal PESO_MINIMO = BigDecimal.ZERO;
-    private static final BigDecimal TALLA_MINIMA = BigDecimal.ZERO;
-    private static final BigDecimal TEMPERATURA_MINIMA = new BigDecimal("30.0");
-    private static final BigDecimal TEMPERATURA_MAXIMA = new BigDecimal("45.0");
-    private static final int FRECUENCIA_CARDIACA_MINIMA = 20;
-    private static final int FRECUENCIA_CARDIACA_MAXIMA = 250;
+    private static final String CONFIRMADA = "Confirmada";
+    private static final String EN_CURSO = "En curso";
+    private static final String ATENDIDA = "Atendida";
 
     private final ConsultasRepository consultasRepository;
     private final CitasRepository citasRepository;
     private final EstadoCitaRepository estadoCitaRepository;
     private final DiagnosticoConsultaRepository diagnosticoConsultaRepository;
+    private final EstadoCitaService estadoCitaService;
 
     public ConsultasServiceImpl(ConsultasRepository consultasRepository,
                                 CitasRepository citasRepository,
                                 EstadoCitaRepository estadoCitaRepository,
-                                DiagnosticoConsultaRepository diagnosticoConsultaRepository) {
+                                DiagnosticoConsultaRepository diagnosticoConsultaRepository,
+                                EstadoCitaService estadoCitaService) {
         this.consultasRepository = consultasRepository;
         this.citasRepository = citasRepository;
         this.estadoCitaRepository = estadoCitaRepository;
         this.diagnosticoConsultaRepository = diagnosticoConsultaRepository;
+        this.estadoCitaService = estadoCitaService;
     }
 
     private ConsultasDTO mapToDTO(Consultas c) {
@@ -74,30 +77,23 @@ public class ConsultasServiceImpl implements ConsultasService {
     }
 
     /**
-     * Valida las reglas de negocio de la consulta médica:
+     * Valida las reglas de negocio de la consulta médica. Los campos obligatorios y los rangos
+     * clínicos (peso, talla, temperatura, frecuencia cardíaca) los valida Bean Validation en
+     * ConsultasDTO (400 con detalles por campo).
      * 1. La cita médica asociada debe existir y estar activa.
-     * 2. No duplicar consultas activas para la misma cita médica.
-     * 3. Rangos clínicos:
-     *    - Peso > 0 (si se informa)
-     *    - Talla > 0 (si se informa)
-     *    - Temperatura entre 30.0°C y 45.0°C (si se informa)
-     *    - Frecuencia cardíaca entre 20 y 250 lpm (si se informa)
+     * 2. No duplicar consultas para la misma cita médica (409).
+     *
+     * @return la cita asociada
      */
-    private void validarReglasDeNegocio(ConsultasDTO dto, Long idConsultaActual) {
+    private Citas validarReglasDeNegocio(ConsultasDTO dto, Long idConsultaActual) {
         if (dto == null) {
-            throw new IllegalArgumentException("Los datos de la consulta no pueden ser nulos");
+            throw new ReglaNegocioException("Los datos de la consulta no pueden ser nulos");
         }
-
-        if (dto.idCita() == null) {
-            throw new IllegalArgumentException("El ID de la cita médica asociada es obligatorio");
-        }
-
         // RN-01: La cita debe existir y estar activa
         Citas cita = citasRepository.findById(dto.idCita())
-                .orElseThrow(() -> new IllegalArgumentException("La cita médica con ID " + dto.idCita() + " no existe"));
-
+                .orElseThrow(() -> new ReglaNegocioException("La cita médica con ID " + dto.idCita() + " no existe"));
         if (cita.getActivo() != null && !cita.getActivo()) {
-            throw new IllegalArgumentException("La cita médica asociada se encuentra inactiva o cancelada");
+            throw new ReglaNegocioException("La cita médica asociada se encuentra inactiva o cancelada");
         }
 
         // RN-02: No duplicar consultas para la misma cita
@@ -107,33 +103,10 @@ public class ConsultasServiceImpl implements ConsultasService {
         } else {
             consultaDuplicada = consultasRepository.existsByIdCitaAndIdConsultaNot(dto.idCita(), idConsultaActual);
         }
-
         if (consultaDuplicada) {
-            throw new IllegalArgumentException("Ya existe una consulta médica registrada para la cita ID: " + dto.idCita());
+            throw new DuplicadoException("Ya existe una consulta médica registrada para la cita ID: " + dto.idCita());
         }
-
-        // RN-03: Rangos clínicos
-        if (dto.peso() != null && dto.peso().compareTo(PESO_MINIMO) <= 0) {
-            throw new IllegalArgumentException("El peso debe ser mayor a cero");
-        }
-
-        if (dto.talla() != null && dto.talla().compareTo(TALLA_MINIMA) <= 0) {
-            throw new IllegalArgumentException("La talla/estatura debe ser mayor a cero");
-        }
-
-        if (dto.temperatura() != null) {
-            if (dto.temperatura().compareTo(TEMPERATURA_MINIMA) < 0 || dto.temperatura().compareTo(TEMPERATURA_MAXIMA) > 0) {
-                throw new IllegalArgumentException("La temperatura corporal debe encontrarse entre " +
-                        TEMPERATURA_MINIMA + "°C y " + TEMPERATURA_MAXIMA + "°C");
-            }
-        }
-
-        if (dto.frecuenciaCardiaca() != null) {
-            if (dto.frecuenciaCardiaca() < FRECUENCIA_CARDIACA_MINIMA || dto.frecuenciaCardiaca() > FRECUENCIA_CARDIACA_MAXIMA) {
-                throw new IllegalArgumentException("La frecuencia cardíaca debe encontrarse entre " +
-                        FRECUENCIA_CARDIACA_MINIMA + " y " + FRECUENCIA_CARDIACA_MAXIMA + " lpm");
-            }
-        }
+        return cita;
     }
 
     @Override
@@ -162,7 +135,7 @@ public class ConsultasServiceImpl implements ConsultasService {
     @Override
     public ConsultasDTO findByCita(Long idCita) {
         if (idCita == null) {
-            throw new IllegalArgumentException("El ID de cita es obligatorio");
+            throw new ReglaNegocioException("El ID de cita es obligatorio");
         }
         Consultas entity = consultasRepository.findByIdCita(idCita)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe consulta registrada para la cita ID: " + idCita));
@@ -170,9 +143,30 @@ public class ConsultasServiceImpl implements ConsultasService {
     }
 
     @Override
+    public List<ConsultasDTO> listarPorCita(Long idCita) {
+        if (idCita == null) {
+            throw new ReglaNegocioException("El ID de cita es obligatorio");
+        }
+        Optional<Consultas> consulta = consultasRepository.findByIdCita(idCita);
+        return consulta.map(this::mapToDTO).map(List::of).orElseGet(List::of);
+    }
+
+    @Override
     @Transactional
     public ConsultasDTO crear(ConsultasDTO dto) {
-        validarReglasDeNegocio(dto, null);
+        Citas cita = validarReglasDeNegocio(dto, null);
+
+        // RN-03: solo se atiende una cita Confirmada o En curso cuya fecha ya llegó (fecha <= hoy)
+        EstadoCita estadoActual = estadoCitaRepository.findById(cita.getIdEstado())
+                .orElseThrow(() -> new RecursoNoEncontradoException("Estado actual de la cita no encontrado"));
+        String descripcionActual = estadoActual.getDescripcion();
+        if (!CONFIRMADA.equalsIgnoreCase(descripcionActual) && !EN_CURSO.equalsIgnoreCase(descripcionActual)) {
+            throw new ReglaNegocioException("Solo se puede registrar la consulta de una cita Confirmada o En curso (la cita está '"
+                    + descripcionActual + "')");
+        }
+        if (cita.getFecha() != null && cita.getFecha().isAfter(LocalDate.now())) {
+            throw new ReglaNegocioException("No se puede registrar la consulta de una cita con fecha futura (" + cita.getFecha() + ")");
+        }
 
         Consultas entity = mapToEntity(dto);
         // Fecha/hora de atención asignada por el servidor si no viene especificada
@@ -183,24 +177,31 @@ public class ConsultasServiceImpl implements ConsultasService {
             entity.setActivo(true);
         }
 
+        // Pasar la cita a "Atendida" respetando la máquina de estados:
+        // Confirmada -> En curso -> Atendida, o En curso -> Atendida.
+        EstadoCita enCurso = buscarEstado(EN_CURSO);
+        EstadoCita atendida = buscarEstado(ATENDIDA);
+        if (CONFIRMADA.equalsIgnoreCase(descripcionActual)) {
+            estadoCitaService.validarTransicion(CONFIRMADA, EN_CURSO);
+        }
+        estadoCitaService.validarTransicion(EN_CURSO, ATENDIDA);
+
         Consultas guardada = consultasRepository.save(entity);
-
-        // Actualizar el estado de la cita a "Atendida" automáticamente
-        citasRepository.findById(dto.idCita()).ifPresent(cita -> {
-            estadoCitaRepository.findByDescripcionIgnoreCase("Atendida").ifPresent(estadoAtendida -> {
-                cita.setIdEstado(estadoAtendida.getIdEstado());
-                citasRepository.save(cita);
-            });
-        });
-
+        cita.setIdEstado(atendida.getIdEstado());
+        citasRepository.save(cita);
         return mapToDTO(guardada);
+    }
+
+    private EstadoCita buscarEstado(String descripcion) {
+        return estadoCitaRepository.findByDescripcionIgnoreCase(descripcion)
+                .orElseThrow(() -> new ReglaNegocioException("Falta el estado '" + descripcion + "' en el catálogo de estados de cita"));
     }
 
     @Override
     @Transactional
     public ConsultasDTO actualizar(ConsultasDTO dto, Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID de la consulta es obligatorio");
+            throw new ReglaNegocioException("El ID de la consulta es obligatorio");
         }
 
         Consultas existente = consultasRepository.findById(id)
@@ -230,7 +231,7 @@ public class ConsultasServiceImpl implements ConsultasService {
     @Transactional
     public void eliminar(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID de la consulta es obligatorio");
+            throw new ReglaNegocioException("El ID de la consulta es obligatorio");
         }
 
         Consultas existente = consultasRepository.findById(id)

@@ -1,7 +1,9 @@
 package com.example.hospital.estadocita.impl;
 
 import com.example.hospital.estadocita.EstadoCita;
+import com.example.hospital.shared.exception.DuplicadoException;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.estadocita.EstadoCitaRepository;
 import com.example.hospital.estadocita.EstadoCitaService;
 import com.example.hospital.estadocita.dto.EstadoCitaDTO;
@@ -63,8 +65,23 @@ public class EstadoCitaServiceImpl implements EstadoCitaService {
         EstadoCita e = new EstadoCita();
         e.setNombre(dto.nombre());
         e.setDescripcion(dto.descripcion() != null ? dto.descripcion().trim() : null);
-        e.setActivo(dto.activo());
+        e.setActivo(dto.activo() != null ? dto.activo() : true); // activo por defecto al crear
         return e;
+    }
+
+    /** Nombre efectivo: el enviado o, si falta, la descripción; máximo 30 caracteres y único (409 si se repite). */
+    private String validarNombre(String nombre, String descripcion, Long idActual) {
+        String efectivo = nombre == null || nombre.isBlank() ? descripcion : nombre.trim();
+        if (efectivo == null || efectivo.length() > 30) {
+            throw new ReglaNegocioException("El nombre del estado no puede superar los 30 caracteres");
+        }
+        boolean duplicado = idActual == null
+                ? estadoCitaRepository.existsByNombreIgnoreCase(efectivo)
+                : estadoCitaRepository.existsByNombreIgnoreCaseAndIdEstadoNot(efectivo, idActual);
+        if (duplicado) {
+            throw new DuplicadoException("Ya existe un estado de cita con el nombre: " + efectivo);
+        }
+        return efectivo;
     }
 
     private String normalizar(String descripcion) {
@@ -101,26 +118,25 @@ public class EstadoCitaServiceImpl implements EstadoCitaService {
     @Transactional
     public EstadoCitaDTO crear(EstadoCitaDTO dto) {
         if (dto == null || dto.descripcion() == null || dto.descripcion().trim().isEmpty()) {
-            throw new IllegalArgumentException("La descripción del estado de cita es obligatoria");
+            throw new ReglaNegocioException("La descripción del estado de cita es obligatoria");
         }
 
         String canonico = obtenerNombreCanonica(dto.descripcion().trim());
 
         // RN-EC-01: Solo admite los valores base
         if (!ESTADOS_BASE.contains(canonico)) {
-            throw new IllegalArgumentException("Descripción no permitida. Valores base válidos: " + ESTADOS_BASE);
+            throw new ReglaNegocioException("Descripción no permitida. Valores base válidos: " + ESTADOS_BASE);
         }
 
         // RN-EC-01: descripcion única
         if (estadoCitaRepository.existsByDescripcionIgnoreCase(canonico)) {
-            throw new IllegalArgumentException("Ya existe un estado de cita con la descripción: " + canonico);
+            throw new DuplicadoException("Ya existe un estado de cita con la descripción: " + canonico);
         }
 
         EstadoCita entity = mapToEntity(dto);
         entity.setDescripcion(canonico);
-        if (entity.getNombre() == null || entity.getNombre().isBlank()) {
-            entity.setNombre(canonico);
-        }
+        // `nombre` es NOT NULL y UNIQUE (30 caracteres): si falta se copia de la descripción
+        entity.setNombre(validarNombre(dto.nombre(), canonico, null));
         if (entity.getActivo() == null) {
             entity.setActivo(true);
         }
@@ -133,7 +149,7 @@ public class EstadoCitaServiceImpl implements EstadoCitaService {
     @Transactional
     public EstadoCitaDTO actualizar(EstadoCitaDTO dto, Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID del estado es obligatorio");
+            throw new ReglaNegocioException("El ID del estado es obligatorio");
         }
 
         EstadoCita existente = estadoCitaRepository.findById(id)
@@ -142,7 +158,7 @@ public class EstadoCitaServiceImpl implements EstadoCitaService {
         // RN-EC-03: Los estados del flujo son valores fijos usados por el código; no se pueden renombrar
         if (ESTADOS_BASE.contains(existente.getDescripcion())) {
             if (dto.descripcion() != null && !dto.descripcion().equalsIgnoreCase(existente.getDescripcion())) {
-                throw new IllegalArgumentException("RN-EC-03: No se permite renombrar un estado base fijo del flujo (" +
+                throw new ReglaNegocioException("RN-EC-03: No se permite renombrar un estado base fijo del flujo (" +
                         existente.getDescripcion() + ")");
             }
         }
@@ -150,16 +166,16 @@ public class EstadoCitaServiceImpl implements EstadoCitaService {
         if (dto.descripcion() != null && !dto.descripcion().trim().isEmpty()) {
             String canonico = obtenerNombreCanonica(dto.descripcion().trim());
             if (!ESTADOS_BASE.contains(canonico)) {
-                throw new IllegalArgumentException("Descripción no permitida. Valores base válidos: " + ESTADOS_BASE);
+                throw new ReglaNegocioException("Descripción no permitida. Valores base válidos: " + ESTADOS_BASE);
             }
             if (estadoCitaRepository.existsByDescripcionIgnoreCaseAndIdEstadoNot(canonico, id)) {
-                throw new IllegalArgumentException("Ya existe otro estado con la descripción: " + canonico);
+                throw new DuplicadoException("Ya existe otro estado con la descripción: " + canonico);
             }
             existente.setDescripcion(canonico);
         }
 
-        if (dto.nombre() != null) {
-            existente.setNombre(dto.nombre());
+        if (dto.nombre() != null && !dto.nombre().isBlank()) {
+            existente.setNombre(validarNombre(dto.nombre(), existente.getDescripcion(), id));
         }
         if (dto.activo() != null) {
             existente.setActivo(dto.activo());
@@ -173,7 +189,7 @@ public class EstadoCitaServiceImpl implements EstadoCitaService {
     @Transactional
     public void eliminar(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID del estado es obligatorio");
+            throw new ReglaNegocioException("El ID del estado es obligatorio");
         }
 
         EstadoCita existente = estadoCitaRepository.findById(id)
@@ -181,7 +197,7 @@ public class EstadoCitaServiceImpl implements EstadoCitaService {
 
         // RN-EC-03: Los estados del flujo son valores fijos usados por el código; no se pueden borrar
         if (ESTADOS_BASE.contains(existente.getDescripcion())) {
-            throw new IllegalArgumentException("RN-EC-03: No se puede eliminar el estado base '" +
+            throw new ReglaNegocioException("RN-EC-03: No se puede eliminar el estado base '" +
                     existente.getDescripcion() + "' porque es requerido por el flujo del sistema");
         }
 
@@ -211,19 +227,19 @@ public class EstadoCitaServiceImpl implements EstadoCitaService {
     @Override
     public void validarTransicion(String estadoOrigen, String estadoDestino) {
         if (estadoOrigen == null || estadoDestino == null) {
-            throw new IllegalArgumentException("El estado origen y destino son requeridos");
+            throw new ReglaNegocioException("El estado origen y destino son requeridos");
         }
 
         String origenCanonica = obtenerNombreCanonica(estadoOrigen);
         String destinoCanonica = obtenerNombreCanonica(estadoDestino);
 
         if (ESTADOS_FINALES.contains(origenCanonica)) {
-            throw new IllegalArgumentException("RN-EC-02: Una cita en estado '" + origenCanonica +
+            throw new ReglaNegocioException("RN-EC-02: Una cita en estado '" + origenCanonica +
                     "' es final y no puede cambiar de estado");
         }
 
         if (!esTransicionPermitida(origenCanonica, destinoCanonica)) {
-            throw new IllegalArgumentException("RN-EC-02: Transición de estado no permitida: '" +
+            throw new ReglaNegocioException("RN-EC-02: Transición de estado no permitida: '" +
                     origenCanonica + "' → '" + destinoCanonica + "'");
         }
     }

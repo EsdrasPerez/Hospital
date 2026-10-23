@@ -5,4 +5,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface AlergiasRepository extends JpaRepository<Alergias, Long> {
+    boolean existsByNombreIgnoreCase(String nombre);
+
+    boolean existsByNombreIgnoreCaseAndIdAlergiasNot(String nombre, Long idAlergias);
 }

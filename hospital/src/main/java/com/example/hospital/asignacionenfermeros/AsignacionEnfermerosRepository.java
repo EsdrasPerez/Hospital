@@ -24,6 +24,8 @@ public interface AsignacionEnfermerosRepository extends JpaRepository<Asignacion
     // Verificar si un enfermero tiene asignaciones registradas
     boolean existsByIdEnfermero(Long idEnfermero);
 
+    boolean existsByIdEnfermeroAndActivoTrue(Long idEnfermero);
+
     List<AsignacionEnfermeros> findByIdHospitalizacion(Long idHospitalizacion);
 
     // RN-13 / RN-14 (Turnos): Verificar si un turno está siendo utilizado en asignaciones

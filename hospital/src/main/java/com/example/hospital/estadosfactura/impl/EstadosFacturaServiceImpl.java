@@ -1,5 +1,6 @@
 package com.example.hospital.estadosfactura.impl;
 
+import com.example.hospital.shared.exception.DuplicadoException;
 import com.example.hospital.estadosfactura.EstadosFactura;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
 import com.example.hospital.estadosfactura.EstadosFacturaRepository;
@@ -173,11 +174,11 @@ public class EstadosFacturaServiceImpl implements EstadosFacturaService {
         // RN-EF-02: Unicidad insensible a mayúsculas/minúsculas
         if (idActualizacion == null) {
             if (repository.existsByDescripcionIgnoreCase(desc)) {
-                throw new ReglaNegocioException("Ya existe un estado de factura con la descripción: " + desc);
+                throw new DuplicadoException("Ya existe un estado de factura con la descripción: " + desc);
             }
         } else {
             if (repository.existsByDescripcionIgnoreCaseAndIdEstadoFacturaNot(desc, idActualizacion)) {
-                throw new ReglaNegocioException("Ya existe otro estado de factura con la descripción: " + desc);
+                throw new DuplicadoException("Ya existe otro estado de factura con la descripción: " + desc);
             }
         }
     }

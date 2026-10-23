@@ -1,9 +1,11 @@
 package com.example.hospital.tratamientomedicamento.impl;
 
+import com.example.hospital.medicamentos.Medicamentos;
 import com.example.hospital.medicamentos.MedicamentosRepository;
 import com.example.hospital.shared.exception.DuplicadoException;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
 import com.example.hospital.shared.exception.ReglaNegocioException;
+import com.example.hospital.tratamiento.Tratamiento;
 import com.example.hospital.tratamiento.TratamientoRepository;
 import com.example.hospital.tratamientomedicamento.TratamientoMedicamento;
 import com.example.hospital.tratamientomedicamento.TratamientoMedicamento.TratamientoMedicamentoId;
@@ -46,6 +48,17 @@ public class TratamientoMedicamentoServiceImpl implements TratamientoMedicamento
 
     @Override
     @Transactional(readOnly = true)
+    public List<TratamientoMedicamentoDTO> buscar(Long idTratamiento, Long idMedicamento) {
+        return tratamientoMedicamentoRepository.findAll()
+                .stream()
+                .filter(t -> idTratamiento == null || idTratamiento.equals(t.getIdTratamiento()))
+                .filter(t -> idMedicamento == null || idMedicamento.equals(t.getIdMedicamento()))
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public TratamientoMedicamentoDTO findById(Long idMedicamento, Long idTratamiento) {
         TratamientoMedicamentoId id = new TratamientoMedicamentoId(idMedicamento, idTratamiento);
         return tratamientoMedicamentoRepository.findById(id)
@@ -60,11 +73,17 @@ public class TratamientoMedicamentoServiceImpl implements TratamientoMedicamento
         if (dto == null || dto.idMedicamento() == null || dto.idTratamiento() == null) {
             throw new ReglaNegocioException("El medicamento y el tratamiento son obligatorios");
         }
-        if (!tratamientoRepository.existsById(dto.idTratamiento())) {
-            throw new RecursoNoEncontradoException("No existe el tratamiento con ID: " + dto.idTratamiento());
+        // Referencias del cuerpo inexistentes o inactivas -> 422.
+        // Prescribir no es dispensar: NO se valida ni se descuenta stock.
+        Tratamiento tratamiento = tratamientoRepository.findById(dto.idTratamiento())
+                .orElseThrow(() -> new ReglaNegocioException("No existe el tratamiento con ID: " + dto.idTratamiento()));
+        if (!Boolean.TRUE.equals(tratamiento.getActivo())) {
+            throw new ReglaNegocioException("No se puede asignar un medicamento a un tratamiento inactivo");
         }
-        if (!medicamentosRepository.existsById(dto.idMedicamento())) {
-            throw new RecursoNoEncontradoException("No existe el medicamento con ID: " + dto.idMedicamento());
+        Medicamentos medicamento = medicamentosRepository.findById(dto.idMedicamento())
+                .orElseThrow(() -> new ReglaNegocioException("No existe el medicamento con ID: " + dto.idMedicamento()));
+        if (!Boolean.TRUE.equals(medicamento.getActivo())) {
+            throw new ReglaNegocioException("No se puede asignar un medicamento inactivo a un tratamiento");
         }
         TratamientoMedicamentoId id = new TratamientoMedicamentoId(dto.idMedicamento(), dto.idTratamiento());
         if (tratamientoMedicamentoRepository.existsById(id)) {

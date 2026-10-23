@@ -1,5 +1,7 @@
 package com.example.hospital.estadoshospitalizacion.impl;
 
+import com.example.hospital.shared.exception.DuplicadoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.estadoshospitalizacion.EstadosHospitalizacion;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
 import com.example.hospital.estadoshospitalizacion.EstadosHospitalizacionRepository;
@@ -83,7 +85,7 @@ public class EstadosHospitalizacionServiceImpl implements EstadosHospitalizacion
     @Transactional(readOnly = true)
     public EstadosHospitalizacionDTO findByDescripcion(String descripcion) {
         if (descripcion == null || descripcion.trim().isEmpty()) {
-            throw new IllegalArgumentException("La descripción de búsqueda es obligatoria.");
+            throw new ReglaNegocioException("La descripción de búsqueda es obligatoria.");
         }
         EstadosHospitalizacion entity = repository.findByDescripcionIgnoreCase(descripcion.trim())
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe el estado de hospitalización con descripción: " + descripcion));
@@ -104,7 +106,7 @@ public class EstadosHospitalizacionServiceImpl implements EstadosHospitalizacion
     @Transactional
     public EstadosHospitalizacionDTO actualizar(EstadosHospitalizacionDTO dto, Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID es obligatorio para la actualización.");
+            throw new ReglaNegocioException("El ID es obligatorio para la actualización.");
         }
 
         EstadosHospitalizacion existente = repository.findById(id)
@@ -115,11 +117,11 @@ public class EstadosHospitalizacionServiceImpl implements EstadosHospitalizacion
         // RN-EH-03: Protección de estados base esenciales del sistema
         boolean eraBase = esEstadoBase(existente.getDescripcion());
         if (eraBase && !existente.getDescripcion().equalsIgnoreCase(dto.descripcion().trim())) {
-            throw new IllegalStateException("No se permite modificar la descripción esencial de los estados base del sistema hospitalario: Activa, Alta, Traslado, Fallecimiento.");
+            throw new ReglaNegocioException("No se permite modificar la descripción esencial de los estados base del sistema hospitalario: Activa, Alta, Traslado, Fallecimiento.");
         }
 
         if (eraBase && Boolean.FALSE.equals(dto.activo())) {
-            throw new IllegalStateException("No se permite desactivar un estado base esencial del sistema hospitalario.");
+            throw new ReglaNegocioException("No se permite desactivar un estado base esencial del sistema hospitalario.");
         }
 
         existente.setDescripcion(dto.descripcion().trim());
@@ -135,7 +137,7 @@ public class EstadosHospitalizacionServiceImpl implements EstadosHospitalizacion
     @Transactional
     public void eliminar(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID no puede ser nulo.");
+            throw new ReglaNegocioException("El ID no puede ser nulo.");
         }
 
         EstadosHospitalizacion existente = repository.findById(id)
@@ -143,12 +145,12 @@ public class EstadosHospitalizacionServiceImpl implements EstadosHospitalizacion
 
         // RN-EH-04: Protección contra eliminación de estados base
         if (esEstadoBase(existente.getDescripcion())) {
-            throw new IllegalStateException("No está permitido eliminar los estados base esenciales del sistema hospitalario (" + existente.getDescripcion() + ").");
+            throw new ReglaNegocioException("No está permitido eliminar los estados base esenciales del sistema hospitalario (" + existente.getDescripcion() + ").");
         }
 
         // RN-EH-05: Integridad referencial contra hospitalizaciones
         if (hospitalizacionesRepository.existsByIdEstadoHosp(id)) {
-            throw new IllegalStateException("No se puede eliminar el estado de hospitalización porque existen pacientes u hospitalizaciones asociadas.");
+            throw new DuplicadoException("No se puede eliminar el estado de hospitalización porque existen pacientes u hospitalizaciones asociadas.");
         }
 
         // RN-EH-06: Borrado lógico
@@ -158,27 +160,27 @@ public class EstadosHospitalizacionServiceImpl implements EstadosHospitalizacion
 
     private void validarReglasDeNegocio(EstadosHospitalizacionDTO dto, Long idActualizacion) {
         if (dto == null) {
-            throw new IllegalArgumentException("Los datos del estado de hospitalización son requeridos.");
+            throw new ReglaNegocioException("Los datos del estado de hospitalización son requeridos.");
         }
 
         // RN-EH-01: Descripción obligatoria y longitud
         if (dto.descripcion() == null || dto.descripcion().trim().isEmpty()) {
-            throw new IllegalArgumentException("La descripción del estado de hospitalización es obligatoria.");
+            throw new ReglaNegocioException("La descripción del estado de hospitalización es obligatoria.");
         }
 
         String desc = dto.descripcion().trim();
         if (desc.length() > 30) {
-            throw new IllegalArgumentException("La descripción no puede exceder los 30 caracteres.");
+            throw new ReglaNegocioException("La descripción no puede exceder los 30 caracteres.");
         }
 
         // RN-EH-02: Unicidad insensible a mayúsculas/minúsculas
         if (idActualizacion == null) {
             if (repository.existsByDescripcionIgnoreCase(desc)) {
-                throw new IllegalArgumentException("Ya existe un estado de hospitalización con la descripción: " + desc);
+                throw new DuplicadoException("Ya existe un estado de hospitalización con la descripción: " + desc);
             }
         } else {
             if (repository.existsByDescripcionIgnoreCaseAndIdEstadoHospNot(desc, idActualizacion)) {
-                throw new IllegalArgumentException("Ya existe otro estado de hospitalización con la descripción: " + desc);
+                throw new DuplicadoException("Ya existe otro estado de hospitalización con la descripción: " + desc);
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.example.hospital.clinicas;
 
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -45,7 +46,7 @@ public class ClinicasController {
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     @Operation(summary = "Registrar clínica", description = "Crea una nueva clínica dentro de un departamento.\n\nRoles permitidos: ADMIN.")
-    public ResponseEntity<ClinicasDTO> save(@RequestBody ClinicasDTO dto) {
+    public ResponseEntity<ClinicasDTO> save(@Valid @RequestBody ClinicasDTO dto) {
         ClinicasDTO creado = clinicasService.crear(dto);
         return new ResponseEntity<>(creado, HttpStatus.CREATED);
     }
@@ -55,7 +56,7 @@ public class ClinicasController {
     @Operation(summary = "Actualizar clínica", description = "Modifica los datos de una clínica existente.\n\nRoles permitidos: ADMIN.")
     public ResponseEntity<ClinicasDTO> update(
             @PathVariable Long id,
-            @RequestBody ClinicasDTO dto) {
+            @Valid @RequestBody ClinicasDTO dto) {
         ClinicasDTO actualizado = clinicasService.actualizar(dto, id);
         return ResponseEntity.ok(actualizado);
     }

@@ -10,6 +10,9 @@ public interface HabitacionService {
 
     List<HabitacionDTO> findActivas();
 
+    /** Filtros opcionales y combinables. */
+    List<HabitacionDTO> buscar(Integer piso, Long idTipoHabitacion, Long idEstadoHabitacion, boolean soloActivas, boolean soloDisponibles);
+
     HabitacionDTO findById(Long id);
 
     HabitacionDTO findByNumero(String numero);

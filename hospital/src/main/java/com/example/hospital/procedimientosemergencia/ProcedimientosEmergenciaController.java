@@ -1,6 +1,7 @@
 package com.example.hospital.procedimientosemergencia;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -44,14 +45,14 @@ public class ProcedimientosEmergenciaController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO')")
     @PostMapping
     @Operation(summary = "Registrar procedimiento", description = "Registra un procedimiento realizado a un paciente en emergencia.\n\nRoles permitidos: ADMIN, MEDICO.")
-    public ResponseEntity<ProcedimientosEmergenciaDTO> crear(@RequestBody ProcedimientosEmergenciaDTO dto) {
+    public ResponseEntity<ProcedimientosEmergenciaDTO> crear(@Valid @RequestBody ProcedimientosEmergenciaDTO dto) {
         return new ResponseEntity<>(procedimientosEmergenciaService.crear(dto), HttpStatus.CREATED);
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO')")
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar procedimiento", description = "Modifica un procedimiento de emergencia.\n\nRoles permitidos: ADMIN, MEDICO.")
-    public ResponseEntity<ProcedimientosEmergenciaDTO> actualizar(@PathVariable Long id, @RequestBody ProcedimientosEmergenciaDTO dto) {
+    public ResponseEntity<ProcedimientosEmergenciaDTO> actualizar(@PathVariable Long id, @Valid @RequestBody ProcedimientosEmergenciaDTO dto) {
         return ResponseEntity.ok(procedimientosEmergenciaService.actualizar(dto, id));
     }
 

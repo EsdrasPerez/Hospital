@@ -20,4 +20,6 @@ public interface EnfermerosRepository extends JpaRepository<Enfermeros, Long> {
 
     // Validar si existen enfermeros asignados a un departamento
     boolean existsByIdDepartamento(Long idDepartamento);
+
+    boolean existsByIdDepartamentoAndActivoTrue(Long idDepartamento);
 }

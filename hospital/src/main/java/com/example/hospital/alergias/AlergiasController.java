@@ -1,5 +1,6 @@
 package com.example.hospital.alergias;
 
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -44,7 +45,7 @@ public class AlergiasController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO')")
     @PostMapping
     @Operation(summary = "Registrar alergia", description = "Agrega una nueva alergia al catálogo. Valida que el nombre no esté duplicado.\n\nRoles permitidos: ADMIN, MEDICO.")
-    public ResponseEntity<AlergiasDTO> save(@RequestBody AlergiasDTO dto) {
+    public ResponseEntity<AlergiasDTO> save(@Valid @RequestBody AlergiasDTO dto) {
         AlergiasDTO creado = alergiasService.crear(dto);
         return new ResponseEntity<>(creado, HttpStatus.CREATED);
     }
@@ -54,7 +55,7 @@ public class AlergiasController {
     @Operation(summary = "Actualizar alergia", description = "Modifica los datos de una alergia existente.\n\nRoles permitidos: ADMIN, MEDICO.")
     public ResponseEntity<AlergiasDTO> update(
             @PathVariable Long id,
-            @RequestBody AlergiasDTO dto) {
+            @Valid @RequestBody AlergiasDTO dto) {
         AlergiasDTO actualizado = alergiasService.actualizar(dto, id);
         return ResponseEntity.ok(actualizado);
     }

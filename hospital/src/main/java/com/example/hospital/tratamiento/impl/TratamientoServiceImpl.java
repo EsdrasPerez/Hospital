@@ -48,27 +48,14 @@ public class TratamientoServiceImpl implements TratamientoService {
             throw new ReglaNegocioException("Los datos del tratamiento son obligatorios.");
         }
 
-        // RN-01: Descripción obligatoria
-        if (dto.descripcion() == null || dto.descripcion().trim().isEmpty()) {
-            throw new ReglaNegocioException("La descripción del tratamiento es obligatoria.");
-        }
-
-        // RN-02: Diagnóstico obligatorio y debe existir activo
-        if (dto.idDiagnostico() == null) {
-            throw new ReglaNegocioException("El ID del diagnóstico asociado es obligatorio.");
-        }
-
+        // RN-01/RN-03: descripción, diagnóstico y duración (>0) los valida Bean Validation en TratamientoDTO
+        // RN-02: El diagnóstico debe existir y estar activo
         Diagnosticos diagnostico = diagnosticosRepository.findById(dto.idDiagnostico())
                 .orElseThrow(() -> new RecursoNoEncontradoException(
                         "El diagnóstico con ID " + dto.idDiagnostico() + " no existe."));
 
         if (!Boolean.TRUE.equals(diagnostico.getActivo())) {
             throw new ReglaNegocioException("El diagnóstico con ID " + dto.idDiagnostico() + " se encuentra inactivo.");
-        }
-
-        // RN-03: Duración en días válida
-        if (dto.duracionDias() != null && dto.duracionDias() <= 0) {
-            throw new ReglaNegocioException("La duración del tratamiento en días debe ser mayor a cero.");
         }
 
         // RN-04: Coherencia de fechas
@@ -107,6 +94,17 @@ public class TratamientoServiceImpl implements TratamientoService {
         Tratamiento entity = tratamientoRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe el tratamiento con ID: " + id));
         return mapToDTO(entity);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TratamientoDTO> buscar(Long idDiagnostico, boolean soloActivos) {
+        return tratamientoRepository.findAll()
+                .stream()
+                .filter(t -> idDiagnostico == null || idDiagnostico.equals(t.getIdDiagnostico()))
+                .filter(t -> !soloActivos || Boolean.TRUE.equals(t.getActivo()))
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
     }
 
     @Override

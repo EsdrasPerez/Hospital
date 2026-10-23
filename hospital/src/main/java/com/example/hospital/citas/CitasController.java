@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import com.example.hospital.citas.dto.CitasDTO;
+import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,25 +31,13 @@ public class CitasController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar citas (con filtros)", description = "Devuelve las citas. Filtros opcionales (se aplica el primero que venga):\n- `idPaciente`: citas de un paciente\n- `idMedico`: citas de un médico\n- `fecha` (yyyy-MM-dd): citas de un día\n- `soloActivas=true`: solo citas activas\n\nSin filtros devuelve todas.\n\nAcceso: cualquier usuario autenticado.")
+    @Operation(summary = "Listar citas (con filtros)", description = "Devuelve las citas. Filtros opcionales y combinables (se aplican todos los que vengan):\n- `idPaciente`: citas de un paciente\n- `idMedico`: citas de un médico\n- `fecha` (yyyy-MM-dd): citas de un día\n- `soloActivas=true`: solo citas activas\n\nSin filtros devuelve todas.\n\nAcceso: cualquier usuario autenticado.")
     public List<CitasDTO> findAll(
             @RequestParam(required = false, defaultValue = "false") boolean soloActivas,
             @RequestParam(required = false) Long idPaciente,
             @RequestParam(required = false) Long idMedico,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
-        if (idPaciente != null) {
-            return citasService.findByPaciente(idPaciente);
-        }
-        if (idMedico != null) {
-            return citasService.findByMedico(idMedico);
-        }
-        if (fecha != null) {
-            return citasService.findByFecha(fecha);
-        }
-        if (soloActivas) {
-            return citasService.findActivas();
-        }
-        return citasService.findAll();
+        return citasService.buscar(idPaciente, idMedico, fecha, soloActivas);
     }
 
     @GetMapping("/agenda")
@@ -68,7 +57,7 @@ public class CitasController {
     @PreAuthorize("hasAnyRole('ADMIN', 'RECEPCIONISTA')")
     @PostMapping
     @Operation(summary = "Programar cita", description = "Crea una nueva cita para un paciente con un médico. Valida que paciente y médico existan y estén activos, y que el médico no tenga otra cita a la misma fecha y hora.\n\nRoles permitidos: ADMIN, RECEPCIONISTA.")
-    public ResponseEntity<CitasDTO> save(@RequestBody CitasDTO dto) {
+    public ResponseEntity<CitasDTO> save(@Valid @RequestBody CitasDTO dto) {
         CitasDTO creada = citasService.crear(dto);
         return new ResponseEntity<>(creada, HttpStatus.CREATED);
     }
@@ -78,7 +67,7 @@ public class CitasController {
     @Operation(summary = "Reprogramar / actualizar cita", description = "Modifica fecha, hora, motivo, médico o paciente de una cita, validando de nuevo choques de horario del médico.\n\nRoles permitidos: ADMIN, RECEPCIONISTA.")
     public ResponseEntity<CitasDTO> update(
             @PathVariable Long id,
-            @RequestBody CitasDTO dto) {
+            @Valid @RequestBody CitasDTO dto) {
         CitasDTO actualizada = citasService.actualizar(dto, id);
         return ResponseEntity.ok(actualizada);
     }

@@ -1,7 +1,9 @@
 package com.example.hospital.emergencia.impl;
 
 import com.example.hospital.emergencia.Emergencia;
+import com.example.hospital.shared.exception.DuplicadoException;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.emergencia.EmergenciaRepository;
 import com.example.hospital.emergencia.EmergenciaService;
 import com.example.hospital.emergencia.dto.EmergenciaDTO;
@@ -81,6 +83,17 @@ public class EmergenciaServiceImpl implements EmergenciaService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<EmergenciaDTO> buscar(Long idPaciente, boolean soloActivas) {
+        return emergenciaRepository.findAll()
+                .stream()
+                .filter(e -> idPaciente == null || idPaciente.equals(e.getIdPaciente()))
+                .filter(e -> !soloActivas || Boolean.TRUE.equals(e.getActivo()))
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public EmergenciaDTO findById(Long id) {
         Emergencia entity = emergenciaRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe el registro de emergencia con ID: " + id));
@@ -91,7 +104,7 @@ public class EmergenciaServiceImpl implements EmergenciaService {
     @Transactional(readOnly = true)
     public List<EmergenciaDTO> findByPaciente(Long idPaciente) {
         if (idPaciente == null) {
-            throw new IllegalArgumentException("El ID del paciente no puede ser nulo.");
+            throw new ReglaNegocioException("El ID del paciente no puede ser nulo.");
         }
         return emergenciaRepository.findByIdPacienteAndActivoTrue(idPaciente)
                 .stream()
@@ -102,18 +115,17 @@ public class EmergenciaServiceImpl implements EmergenciaService {
     @Override
     @Transactional
     public EmergenciaDTO crear(EmergenciaDTO dto) {
-        validarReglasDeNegocio(dto, true);
+        validarReglasDeNegocio(dto);
 
         Emergencia entity = new Emergencia();
         entity.setNombreTemporal(dto.nombreTemporal() != null ? dto.nombreTemporal().trim() : null);
-
         // RN-EM-07: Si no se especifica fecha de ingreso, el servidor la asigna automáticamente
         LocalDateTime fechaIngreso = dto.fechaHoraIngreso() != null ? dto.fechaHoraIngreso() : LocalDateTime.now();
         entity.setFechaHoraIngreso(fechaIngreso);
-
         entity.setMotivo(dto.motivo().trim());
         entity.setSignosVitales(dto.signosVitales() != null ? dto.signosVitales().trim() : null);
-        entity.setFechaHoraAlta(dto.fechaHoraAlta());
+        // RN-EM-08: el alta solo se registra con PATCH /dar-alta; un ingreso nuevo nace sin alta
+        entity.setFechaHoraAlta(null);
         entity.setIdPaciente(dto.idPaciente());
         entity.setIdHabitacion(dto.idHabitacion());
         entity.setIdMedico(dto.idMedico());
@@ -128,21 +140,25 @@ public class EmergenciaServiceImpl implements EmergenciaService {
     @Transactional
     public EmergenciaDTO actualizar(EmergenciaDTO dto, Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID de la emergencia es obligatorio para la actualización.");
+            throw new ReglaNegocioException("El ID de la emergencia es obligatorio para la actualización.");
         }
 
         Emergencia existente = emergenciaRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe el registro de emergencia con ID: " + id));
 
-        validarReglasDeNegocio(dto, false);
+        validarReglasDeNegocio(dto);
 
         existente.setNombreTemporal(dto.nombreTemporal() != null ? dto.nombreTemporal().trim() : null);
         if (dto.fechaHoraIngreso() != null) {
+            if (existente.getFechaHoraAlta() != null && existente.getFechaHoraAlta().isBefore(dto.fechaHoraIngreso())) {
+                throw new ReglaNegocioException("La fecha y hora de ingreso no puede ser posterior a la fecha de alta ("
+                        + existente.getFechaHoraAlta() + ").");
+            }
             existente.setFechaHoraIngreso(dto.fechaHoraIngreso());
         }
         existente.setMotivo(dto.motivo().trim());
         existente.setSignosVitales(dto.signosVitales() != null ? dto.signosVitales().trim() : null);
-        existente.setFechaHoraAlta(dto.fechaHoraAlta());
+        // RN-EM-08: fechaHoraAlta NO se modifica aquí (se conserva); el alta se gestiona con PATCH /dar-alta
         existente.setIdPaciente(dto.idPaciente());
         existente.setIdHabitacion(dto.idHabitacion());
         existente.setIdMedico(dto.idMedico());
@@ -159,24 +175,25 @@ public class EmergenciaServiceImpl implements EmergenciaService {
     @Transactional
     public EmergenciaDTO darAlta(Long id, LocalDateTime fechaHoraAlta) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID de la emergencia no puede ser nulo.");
+            throw new ReglaNegocioException("El ID de la emergencia no puede ser nulo.");
         }
 
         Emergencia existente = emergenciaRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe el registro de emergencia con ID: " + id));
 
         if (!Boolean.TRUE.equals(existente.getActivo())) {
-            throw new IllegalStateException("No se puede dar de alta una emergencia inactiva.");
+            throw new ReglaNegocioException("No se puede dar de alta una emergencia inactiva.");
         }
 
+        // Conflicto de estado: el alta ya fue registrada (409)
         if (existente.getFechaHoraAlta() != null) {
-            throw new IllegalStateException("La emergencia ya cuenta con fecha y hora de alta registrada.");
+            throw new DuplicadoException("La emergencia ya cuenta con fecha y hora de alta registrada.");
         }
 
         LocalDateTime altaEfectiva = fechaHoraAlta != null ? fechaHoraAlta : LocalDateTime.now();
 
         if (existente.getFechaHoraIngreso() != null && altaEfectiva.isBefore(existente.getFechaHoraIngreso())) {
-            throw new IllegalArgumentException("La fecha y hora de alta no puede ser anterior a la fecha de ingreso (" 
+            throw new ReglaNegocioException("La fecha y hora de alta no puede ser anterior a la fecha de ingreso ("
                     + existente.getFechaHoraIngreso() + ").");
         }
 
@@ -189,13 +206,13 @@ public class EmergenciaServiceImpl implements EmergenciaService {
     @Transactional
     public void eliminar(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("El ID no puede ser nulo.");
+            throw new ReglaNegocioException("El ID no puede ser nulo.");
         }
 
         Emergencia existente = emergenciaRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe el registro de emergencia con ID: " + id));
 
-        // RN-EM-09: Integridad con procedimientos de emergencia
+        // RN-EM-09: Integridad con procedimientos de emergencia (conflicto con dependientes: 409)
         if (procedimientosEmergenciaRepository.existsByIdEmergenciaAndActivoTrue(id)) {
             throw new IllegalStateException("No se puede eliminar la emergencia porque tiene procedimientos médicos de emergencia activos asociados.");
         }
@@ -205,70 +222,60 @@ public class EmergenciaServiceImpl implements EmergenciaService {
         emergenciaRepository.save(existente);
     }
 
-    private void validarReglasDeNegocio(EmergenciaDTO dto, boolean esCreacion) {
+    /**
+     * Reglas de negocio del ingreso. El motivo, el nivel de triaje y los tamaños los valida Bean
+     * Validation en EmergenciaDTO (400 con detalles). Las referencias inexistentes o inactivas en el
+     * cuerpo responden 422.
+     */
+    private void validarReglasDeNegocio(EmergenciaDTO dto) {
         if (dto == null) {
-            throw new IllegalArgumentException("Los datos de la emergencia son obligatorios.");
-        }
-
-        // RN-EM-01: Motivo obligatorio
-        if (dto.motivo() == null || dto.motivo().trim().isEmpty()) {
-            throw new IllegalArgumentException("El motivo de atención de la emergencia es obligatorio.");
+            throw new ReglaNegocioException("Los datos de la emergencia son obligatorios.");
         }
 
         // RN-EM-02: Identificación del paciente
         boolean tienePacienteRegistrado = dto.idPaciente() != null;
         boolean tieneNombreTemporal = dto.nombreTemporal() != null && !dto.nombreTemporal().trim().isEmpty();
-
         if (!tienePacienteRegistrado && !tieneNombreTemporal) {
-            throw new IllegalArgumentException("Debe especificarse un paciente registrado o un nombre temporal para el paciente no identificado.");
+            throw new ReglaNegocioException("Debe especificarse un paciente registrado o un nombre temporal para el paciente no identificado.");
         }
 
         // RN-EM-03: Validación de paciente registrado
         if (dto.idPaciente() != null) {
             Paciente paciente = pacienteRepository.findById(dto.idPaciente())
-                    .orElseThrow(() -> new IllegalArgumentException("El paciente con ID " + dto.idPaciente() + " no existe."));
+                    .orElseThrow(() -> new ReglaNegocioException("El paciente con ID " + dto.idPaciente() + " no existe."));
             if (!Boolean.TRUE.equals(paciente.getActivo())) {
-                throw new IllegalStateException("El paciente con ID " + dto.idPaciente() + " se encuentra inactivo.");
+                throw new ReglaNegocioException("El paciente con ID " + dto.idPaciente() + " se encuentra inactivo.");
             }
         }
 
         // RN-EM-04: Validación de médico asignado
         if (dto.idMedico() != null) {
             Medico medico = medicoRepository.findById(dto.idMedico())
-                    .orElseThrow(() -> new IllegalArgumentException("El médico con ID " + dto.idMedico() + " no existe."));
+                    .orElseThrow(() -> new ReglaNegocioException("El médico con ID " + dto.idMedico() + " no existe."));
             if (!Boolean.TRUE.equals(medico.getEstado())) {
-                throw new IllegalStateException("El médico con ID " + dto.idMedico() + " se encuentra inactivo.");
+                throw new ReglaNegocioException("El médico con ID " + dto.idMedico() + " se encuentra inactivo.");
             }
         }
 
         // RN-EM-05: Validación de habitación / box
         if (dto.idHabitacion() != null) {
             Habitacion habitacion = habitacionRepository.findById(dto.idHabitacion())
-                    .orElseThrow(() -> new IllegalArgumentException("La habitación con ID " + dto.idHabitacion() + " no existe."));
+                    .orElseThrow(() -> new ReglaNegocioException("La habitación con ID " + dto.idHabitacion() + " no existe."));
             if (!Boolean.TRUE.equals(habitacion.getActivo())) {
-                throw new IllegalStateException("La habitación con ID " + dto.idHabitacion() + " se encuentra inactiva.");
+                throw new ReglaNegocioException("La habitación con ID " + dto.idHabitacion() + " se encuentra inactiva.");
             }
         }
 
-        // RN-EM-06: Validación de triaje
-        if (dto.idTriaje() != null) {
-            Triaje triaje = triajeRepository.findById(dto.idTriaje())
-                    .orElseThrow(() -> new IllegalArgumentException("El nivel de triaje con ID " + dto.idTriaje() + " no existe."));
-            if (!Boolean.TRUE.equals(triaje.getActivo())) {
-                throw new IllegalStateException("El nivel de triaje con ID " + dto.idTriaje() + " se encuentra inactivo.");
-            }
+        // RN-EM-06: Validación de triaje (obligatorio: lo exige Bean Validation)
+        Triaje triaje = triajeRepository.findById(dto.idTriaje())
+                .orElseThrow(() -> new ReglaNegocioException("El nivel de triaje con ID " + dto.idTriaje() + " no existe."));
+        if (!Boolean.TRUE.equals(triaje.getActivo())) {
+            throw new ReglaNegocioException("El nivel de triaje con ID " + dto.idTriaje() + " se encuentra inactivo.");
         }
 
         // RN-EM-07: Fecha de ingreso no futura (con tolerancia de 5 minutos)
         if (dto.fechaHoraIngreso() != null && dto.fechaHoraIngreso().isAfter(LocalDateTime.now().plusMinutes(5))) {
-            throw new IllegalArgumentException("La fecha y hora de ingreso a emergencias no puede ser una fecha futura.");
-        }
-
-        // RN-EM-08: Coherencia de fecha de alta
-        if (dto.fechaHoraAlta() != null && dto.fechaHoraIngreso() != null) {
-            if (dto.fechaHoraAlta().isBefore(dto.fechaHoraIngreso())) {
-                throw new IllegalArgumentException("La fecha y hora de alta no puede ser anterior a la fecha y hora de ingreso.");
-            }
+            throw new ReglaNegocioException("La fecha y hora de ingreso a emergencias no puede ser una fecha futura.");
         }
     }
 }

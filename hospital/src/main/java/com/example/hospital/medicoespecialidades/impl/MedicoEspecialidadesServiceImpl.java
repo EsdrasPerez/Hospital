@@ -1,5 +1,7 @@
 package com.example.hospital.medicoespecialidades.impl;
 
+import com.example.hospital.shared.exception.DuplicadoException;
+import com.example.hospital.shared.exception.ReglaNegocioException;
 import com.example.hospital.especialidadmedico.EspecialidadMedico;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
 import com.example.hospital.especialidadmedico.EspecialidadMedicoRepository;
@@ -47,7 +49,7 @@ public class MedicoEspecialidadesServiceImpl implements MedicoEspecialidadesServ
     @Override
     public List<MedicoEspecialidadesDTO> findByMedico(Long idMedico) {
         if (idMedico == null) {
-            throw new IllegalArgumentException("El ID del médico es obligatorio");
+            throw new ReglaNegocioException("El ID del médico es obligatorio");
         }
         return medicoEspecialidadesRepository.findByIdMedico(idMedico)
                 .stream()
@@ -58,7 +60,7 @@ public class MedicoEspecialidadesServiceImpl implements MedicoEspecialidadesServ
     @Override
     public List<MedicoEspecialidadesDTO> findByEspecialidad(Long idEspecialidad) {
         if (idEspecialidad == null) {
-            throw new IllegalArgumentException("El ID de la especialidad es obligatorio");
+            throw new ReglaNegocioException("El ID de la especialidad es obligatorio");
         }
         return medicoEspecialidadesRepository.findByIdEspecialidad(idEspecialidad)
                 .stream()
@@ -69,7 +71,7 @@ public class MedicoEspecialidadesServiceImpl implements MedicoEspecialidadesServ
     @Override
     public MedicoEspecialidadesDTO findById(Long idEspecialidad, Long idMedico) {
         if (idEspecialidad == null || idMedico == null) {
-            throw new IllegalArgumentException("Ambas claves (idEspecialidad e idMedico) son obligatorias");
+            throw new ReglaNegocioException("Ambas claves (idEspecialidad e idMedico) son obligatorias");
         }
         MedicoEspecialidades.MedicoEspecialidadesId id = new MedicoEspecialidades.MedicoEspecialidadesId(idEspecialidad, idMedico);
         MedicoEspecialidades entity = medicoEspecialidadesRepository.findById(id)
@@ -81,25 +83,25 @@ public class MedicoEspecialidadesServiceImpl implements MedicoEspecialidadesServ
     @Transactional
     public MedicoEspecialidadesDTO crear(MedicoEspecialidadesDTO dto) {
         if (dto == null || dto.idEspecialidad() == null || dto.idMedico() == null) {
-            throw new IllegalArgumentException("El ID de especialidad y el ID de médico son obligatorios");
+            throw new ReglaNegocioException("El ID de especialidad y el ID de médico son obligatorios");
         }
 
         // 1. Validar que el médico exista
         if (!medicoRepository.existsById(dto.idMedico())) {
-            throw new IllegalArgumentException("El médico con ID " + dto.idMedico() + " no existe");
+            throw new ReglaNegocioException("El médico con ID " + dto.idMedico() + " no existe");
         }
 
         // 2. Validar que la especialidad médica exista y esté activa
         EspecialidadMedico esp = especialidadMedicoRepository.findById(dto.idEspecialidad())
-                .orElseThrow(() -> new IllegalArgumentException("La especialidad médica con ID " + dto.idEspecialidad() + " no existe"));
+                .orElseThrow(() -> new ReglaNegocioException("La especialidad médica con ID " + dto.idEspecialidad() + " no existe"));
 
         if (esp.getActivo() != null && !esp.getActivo()) {
-            throw new IllegalArgumentException("La especialidad médica '" + esp.getNombre() + "' se encuentra inactiva");
+            throw new ReglaNegocioException("La especialidad médica '" + esp.getNombre() + "' se encuentra inactiva");
         }
 
         // 3. Validar duplicado del par (idEspecialidad, idMedico)
         if (medicoEspecialidadesRepository.existsByIdEspecialidadAndIdMedico(dto.idEspecialidad(), dto.idMedico())) {
-            throw new IllegalArgumentException("El médico ya tiene asignada esta especialidad");
+            throw new DuplicadoException("El médico ya tiene asignada esta especialidad");
         }
 
         MedicoEspecialidades entity = new MedicoEspecialidades(dto.idEspecialidad(), dto.idMedico());
@@ -111,7 +113,7 @@ public class MedicoEspecialidadesServiceImpl implements MedicoEspecialidadesServ
     @Transactional
     public void eliminar(Long idEspecialidad, Long idMedico) {
         if (idEspecialidad == null || idMedico == null) {
-            throw new IllegalArgumentException("Ambas claves son obligatorias para eliminar la asignación");
+            throw new ReglaNegocioException("Ambas claves son obligatorias para eliminar la asignación");
         }
 
         MedicoEspecialidades.MedicoEspecialidadesId id = new MedicoEspecialidades.MedicoEspecialidadesId(idEspecialidad, idMedico);

@@ -1,6 +1,7 @@
 package com.example.hospital.diagnosticoconsulta;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -56,7 +57,7 @@ public class DiagnosticoConsultaController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MEDICO')")
     @PostMapping
     @Operation(summary = "Asociar diagnóstico a consulta", description = "Vincula un diagnóstico a una consulta. No permite duplicados.\n\nRoles permitidos: ADMIN, MEDICO.")
-    public ResponseEntity<DiagnosticoConsultaDTO> save(@RequestBody DiagnosticoConsultaDTO dto) {
+    public ResponseEntity<DiagnosticoConsultaDTO> save(@Valid @RequestBody DiagnosticoConsultaDTO dto) {
         DiagnosticoConsultaDTO creado = diagnosticoConsultaService.crear(dto);
         return new ResponseEntity<>(creado, HttpStatus.CREATED);
     }

@@ -1,5 +1,6 @@
 package com.example.hospital.paciente.impl;
 
+import com.example.hospital.shared.catalogos.EstadosCatalogo;
 import com.example.hospital.alergias.Alergias;
 import com.example.hospital.alergias.AlergiasRepository;
 import com.example.hospital.citas.CitasRepository;
@@ -11,6 +12,7 @@ import com.example.hospital.paciente.PacienteMapper;
 import com.example.hospital.paciente.PacienteRepository;
 import com.example.hospital.paciente.PacienteService;
 import com.example.hospital.paciente.dto.PacienteRequest;
+import com.example.hospital.paciente.dto.PacienteResumenDTO;
 import com.example.hospital.paciente.dto.PacienteResponse;
 import com.example.hospital.shared.exception.DuplicadoException;
 import com.example.hospital.shared.exception.RecursoNoEncontradoException;
@@ -29,8 +31,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PacienteServiceImpl implements PacienteService {
 
-    private static final Long ESTADO_HOSP_ACTIVA = 1L;
-
     private final PacienteRepository repository;
     private final AlergiasRepository alergiasRepository;
     private final TipoSangreRepository tipoSangreRepository;
@@ -39,6 +39,8 @@ public class PacienteServiceImpl implements PacienteService {
     private final EmergenciaRepository emergenciaRepository;
     private final CuentasRepository cuentasRepository;
     private final PacienteMapper mapper;
+    // El estado de hospitalización Activa se resuelve por nombre, no por id fijo
+    private final EstadosCatalogo estados;
 
     @Override
     @Transactional(readOnly = true)
@@ -60,6 +62,13 @@ public class PacienteServiceImpl implements PacienteService {
 
     @Override
     @Transactional(readOnly = true)
+    public PacienteResponse obtenerDetalle(Long id) {
+        return mapper.toResponse(repository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Paciente " + id + " no encontrado")));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public PacienteResponse buscarPorDpi(String dpi) {
         if (dpi == null || dpi.trim().isEmpty()) {
             throw new ReglaNegocioException("El DPI de búsqueda no puede estar vacío");
@@ -72,15 +81,55 @@ public class PacienteServiceImpl implements PacienteService {
     @Override
     @Transactional(readOnly = true)
     public List<PacienteResponse> buscar(String criterio) {
+        return buscar(criterio, false);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PacienteResponse> buscar(String criterio, boolean todos) {
         if (criterio == null || criterio.trim().isEmpty()) {
-            return listar();
+            return todos ? listarTodos() : listar();
         }
         String valor = criterio.trim();
-        return repository.findByNombreContainingIgnoreCaseOrApellidoPaternoContainingIgnoreCaseOrDpiPacienteContaining(valor, valor, valor)
+        return repository.findByNombreContainingIgnoreCaseOrApellidoPaternoContainingIgnoreCaseOrApellidoMaternoContainingIgnoreCaseOrDpiPacienteContainingIgnoreCase(valor, valor, valor, valor)
                 .stream()
-                .filter(p -> Boolean.TRUE.equals(p.getActivo()))
+                .filter(p -> todos || Boolean.TRUE.equals(p.getActivo()))
                 .map(mapper::toResponse)
                 .toList();
+    }
+
+    // Mínimo privilegio para caja: búsqueda de identificación; con menos de 2 caracteres devuelve lista vacía
+    private static final int LARGO_MINIMO_BUSQUEDA = 2;
+    private static final int MAXIMO_RESULTADOS = 20;
+
+    private PacienteResumenDTO toResumen(Paciente p) {
+        String nombre = java.util.stream.Stream.of(p.getNombre(), p.getApellidoPaterno(), p.getApellidoMaterno())
+                .filter(t -> t != null && !t.isBlank())
+                .collect(java.util.stream.Collectors.joining(" "));
+        return new PacienteResumenDTO(p.getIdPaciente(), nombre, p.getDpiPaciente(), p.getActivo());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PacienteResumenDTO> buscarResumen(String q) {
+        if (q == null || q.trim().length() < LARGO_MINIMO_BUSQUEDA) {
+            return List.of();
+        }
+        String valor = q.trim();
+        return repository.findByNombreContainingIgnoreCaseOrApellidoPaternoContainingIgnoreCaseOrApellidoMaternoContainingIgnoreCaseOrDpiPacienteContainingIgnoreCase(valor, valor, valor, valor)
+                .stream()
+                .filter(p -> Boolean.TRUE.equals(p.getActivo()))
+                .map(this::toResumen)
+                .sorted(java.util.Comparator.comparing(PacienteResumenDTO::nombreCompleto, String.CASE_INSENSITIVE_ORDER))
+                .limit(MAXIMO_RESULTADOS)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PacienteResumenDTO resumen(Long id) {
+        return toResumen(repository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Paciente " + id + " no encontrado")));
     }
 
     @Override
@@ -114,7 +163,7 @@ public class PacienteServiceImpl implements PacienteService {
             throw new ReglaNegocioException("No se puede desactivar el paciente porque tiene citas médicas activas.");
         }
 
-        if (hospitalizacionesRepository.existsByIdPacienteAndIdEstadoHosp(id, ESTADO_HOSP_ACTIVA)) {
+        if (hospitalizacionesRepository.existsByIdPacienteAndIdEstadoHosp(id, estados.hospActiva())) {
             throw new ReglaNegocioException("No se puede desactivar el paciente porque tiene una hospitalización activa en curso.");
         }
 
