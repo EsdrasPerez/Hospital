@@ -3,10 +3,12 @@
 Interfaz web del proyecto API Hospital (Arquitectura de Sistemas, UMES).
 Stack: Vite + React 19 (JavaScript), React Router, axios, Bootstrap 4.6 y reactstrap 9 con el tema Now UI Dashboard (Creative Tim).
 
+Este README cubre solo la interfaz. La visión general del proyecto, la creación de la base de datos, las variables de entorno del backend y cómo levantarlo están en el [README de la raíz](../README.md); la arquitectura, la API y las pruebas, en [`docs/`](../docs/arquitectura.md) ([API](../docs/api.md), [pruebas](../docs/pruebas.md)).
+
 ## Requisitos
 
 - Node.js 20.19 o superior (probado con Node 24) y npm.
-- El backend (`../hospital`, Spring Boot) **debe estar corriendo en http://localhost:8080** con su base de datos PostgreSQL.
+- El backend (`../hospital`, Spring Boot) **debe estar corriendo en http://localhost:8080** con su base de datos PostgreSQL (pasos en el [README de la raíz](../README.md#puesta-en-marcha)).
 
 ## Puesta en marcha
 
@@ -19,7 +21,7 @@ npm run dev
 
 La aplicación queda en http://localhost:5173. El puerto está fijado (`strictPort`) porque es el único origen que permite el CORS del backend (`app.cors.allowed-origins`).
 
-Para entrar se necesita un usuario del backend (el administrador inicial lo crea el backend al arrancar; ver `app.admin.*` en `hospital/src/main/resources/application.properties`).
+Para entrar se necesita un usuario del backend (el administrador inicial lo crea el backend al arrancar con las variables `ADMIN_USER` y `ADMIN_PASSWORD`; ver el [README de la raíz](../README.md#3-levantar-el-backend)).
 
 ## Variables de entorno
 
@@ -83,11 +85,11 @@ Decisiones:
 - Filtros: se envían al servidor siempre que el backend los combina; la búsqueda por texto se resuelve en el cliente cuando el backend no la ofrece.
 - Los roles son fijos del sistema y se muestran en solo lectura; los catálogos protegen los valores base (estados de cita, factura, habitación, hospitalización, tipos base).
 - Caja (CAJERO) no puede leer pacientes: usa `PacienteSelector` con los endpoints mínimos `/api/v1/paciente/busqueda` y `/{id}/resumen`.
-- Tipografía: Montserrat se carga desde Google Fonts (sin conexión se usa la fuente del sistema). Pendiente: alojar los archivos woff2 localmente.
+- Tipografía: Montserrat se carga desde Google Fonts (sin conexión se usa la fuente del sistema).
 
 Pendientes:
 
 - Lectura abierta de datos financieros: `GET` de facturas, líneas y cuentas sigue abierto a cualquier usuario autenticado (política de lectura por definir). El historial del paciente ya omite cuentas y facturas para MEDICO y ENFERMERO.
 - No hay renovación del token: un token vigente de un usuario desactivado deja de funcionar (401), pero al expirar hay que volver a entrar.
-- Montserrat se carga desde Google Fonts; pendiente alojar los archivos woff2 localmente.
+- Alojar localmente los archivos woff2 de Montserrat (hoy se cargan desde Google Fonts).
 - Faltan pruebas automáticas de interfaz (solo se probó a mano y con las pruebas unitarias del backend).
